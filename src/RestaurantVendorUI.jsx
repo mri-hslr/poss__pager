@@ -1,126 +1,70 @@
 import React, { useState } from 'react';
-import { ShoppingCart, Plus, Minus, Trash2, Check, Utensils, ChefHat } from 'lucide-react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  ShoppingCart,
+  Plus,
+  Minus,
+  Trash2,
+  Check,
+  ChefHat,
+  X,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Separator } from '@/components/ui/separator';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 const RestaurantVendorUI = () => {
   const [cart, setCart] = useState([]);
   const [selectedToken, setSelectedToken] = useState('1');
   const [orders, setOrders] = useState([]);
+  const [cartOpen, setCartOpen] = useState(false);
 
-  // Hardcoded menu with premium descriptions
   const menu = {
-    "Starters": [
-      { 
-        id: 1, 
-        name: "Paneer Tikka", 
-        price: 180, 
-        category: "Starters", 
-        desc: "Cottage cheese marinated in aromatic spices, charred to perfection"
-      },
-      { 
-        id: 2, 
-        name: "Spring Rolls", 
-        price: 120, 
-        category: "Starters", 
-        desc: "Crisp golden parcels filled with seasonal vegetables"
-      },
-      { 
-        id: 3, 
-        name: "Chicken Wings", 
-        price: 220, 
-        category: "Starters", 
-        desc: "Tender wings glazed with house-made buffalo sauce"
-      }
+    Starters: [
+      { id: 1, name: 'Paneer Tikka', price: 180, desc: 'Grilled cottage cheese' },
+      { id: 2, name: 'Spring Rolls', price: 120, desc: 'Veg crispy rolls' },
+      { id: 3, name: 'Chicken Wings', price: 220, desc: 'Buffalo wings' },
+      { id: 4, name: 'Veg Cutlet', price: 90, desc: 'Crispy veg patty' },
+      { id: 5, name: 'French Fries', price: 80, desc: 'Classic fries' },
+      { id: 6, name: 'Cheese Balls', price: 140, desc: 'Mozzarella bites' },
+      { id: 7, name: 'Nachos', price: 160, desc: 'Cheese loaded' },
     ],
-    "Main Course": [
-      { 
-        id: 4, 
-        name: "Butter Chicken", 
-        price: 280, 
-        category: "Main Course", 
-        desc: "Succulent chicken in velvety tomato & cream reduction"
-      },
-      { 
-        id: 5, 
-        name: "Dal Makhani", 
-        price: 180, 
-        category: "Main Course", 
-        desc: "Black lentils slow-cooked overnight with butter & cream"
-      },
-      { 
-        id: 6, 
-        name: "Biryani", 
-        price: 250, 
-        category: "Main Course", 
-        desc: "Fragrant basmati rice layered with aromatic spices",
-        image: "🍚"
-      },
-      { 
-        id: 7, 
-        name: "Paneer Butter Masala", 
-        price: 240, 
-        category: "Main Course", 
-        desc: "Cottage cheese in rich tomato-based curry"
-      }
+    'Main Course': [
+      { id: 8, name: 'Butter Chicken', price: 280, desc: 'Creamy curry' },
+      { id: 9, name: 'Dal Makhani', price: 180, desc: 'Slow cooked dal' },
+      { id: 10, name: 'Paneer Butter Masala', price: 240, desc: 'Rich gravy' },
+      { id: 11, name: 'Veg Biryani', price: 210, desc: 'Spiced rice' },
+      { id: 12, name: 'Chicken Biryani', price: 260, desc: 'Hyderabadi style' },
+      { id: 13, name: 'Kadhai Paneer', price: 230, desc: 'Spicy masala' },
+      { id: 14, name: 'Rajma Chawal', price: 170, desc: 'Comfort food' },
     ],
-    "Breads": [
-      { 
-        id: 8, 
-        name: "Naan", 
-        price: 40, 
-        category: "Breads", 
-        desc: "Clay oven-baked leavened bread, pillowy soft"
-      },
-      { 
-        id: 9, 
-        name: "Roti", 
-        price: 20, 
-        category: "Breads", 
-        desc: "Stone-ground whole wheat flatbread"
-      },
-      { 
-        id: 10, 
-        name: "Garlic Naan", 
-        price: 60, 
-        category: "Breads", 
-        desc: "Naan brushed with roasted garlic butter"
-          }
+    Breads: [
+      { id: 15, name: 'Naan', price: 40, desc: 'Tandoor bread' },
+      { id: 16, name: 'Butter Naan', price: 50, desc: 'Buttery naan' },
+      { id: 17, name: 'Garlic Naan', price: 60, desc: 'Garlic topping' },
+      { id: 18, name: 'Roti', price: 20, desc: 'Wheat roti' },
+      { id: 19, name: 'Paratha', price: 45, desc: 'Layered bread' },
+      { id: 20, name: 'Lachha Paratha', price: 55, desc: 'Crispy layers' },
     ],
-    "Beverages": [
-      { 
-        id: 11, 
-        name: "Lassi", 
-        price: 80, 
-        category: "Beverages", 
-        desc: "Traditional churned yogurt drink, subtly sweetened"
-      },
-      { 
-        id: 12, 
-        name: "Cold Drink", 
-        price: 50, 
-        category: "Beverages", 
-        desc: "Chilled carbonated refreshment"
-      },
-      { 
-        id: 13, 
-        name: "Water Bottle", 
-        price: 20, 
-        category: "Beverages", 
-        desc: "Purified still water"      }
-    ]
+    Beverages: [
+      { id: 21, name: 'Cold Coffee', price: 120, desc: 'With ice cream' },
+      { id: 22, name: 'Lassi', price: 80, desc: 'Sweet yogurt' },
+      { id: 23, name: 'Lemon Soda', price: 60, desc: 'Refreshing' },
+      { id: 24, name: 'Cold Drink', price: 50, desc: 'Chilled soda' },
+      { id: 25, name: 'Water Bottle', price: 20, desc: 'Packaged water' },
+    ],
   };
 
   const addToCart = (item) => {
-    const existingItem = cart.find(cartItem => cartItem.id === item.id);
-    if (existingItem) {
-      setCart(cart.map(cartItem => 
-        cartItem.id === item.id 
-          ? { ...cartItem, quantity: cartItem.quantity + 1 }
-          : cartItem
+    const found = cart.find((c) => c.id === item.id);
+    if (found) {
+      setCart(cart.map((c) =>
+        c.id === item.id ? { ...c, quantity: c.quantity + 1 } : c
       ));
     } else {
       setCart([...cart, { ...item, quantity: 1 }]);
@@ -128,286 +72,156 @@ const RestaurantVendorUI = () => {
   };
 
   const updateQuantity = (id, delta) => {
-    setCart(cart.map(item => 
-      item.id === id 
-        ? { ...item, quantity: Math.max(0, item.quantity + delta) }
-        : item
-    ).filter(item => item.quantity > 0));
+    setCart(
+      cart
+        .map((item) =>
+          item.id === id
+            ? { ...item, quantity: item.quantity + delta }
+            : item
+        )
+        .filter((item) => item.quantity > 0)
+    );
   };
 
   const removeFromCart = (id) => {
-    setCart(cart.filter(item => item.id !== id));
+    setCart(cart.filter((item) => item.id !== id));
   };
 
-  const getCartTotal = () => {
-    return cart.reduce((total, item) => total + (item.price * item.quantity), 0);
-  };
+  const total = cart.reduce((sum, i) => sum + i.price * i.quantity, 0);
 
   const placeOrder = () => {
-    if (cart.length === 0) {
-      alert('Cart is empty!');
-      return;
-    }
+    if (!cart.length) return;
 
-    const newOrder = {
-      id: Date.now(),
-      token: selectedToken,
-      items: [...cart],
-      total: getCartTotal(),
-      timestamp: new Date().toLocaleTimeString()
-    };
+    setOrders([
+      ...orders,
+      {
+        id: Date.now(),
+        token: selectedToken,
+        items: cart,
+        total,
+      },
+    ]);
 
-    setOrders([...orders, newOrder]);
     setCart([]);
-    
-    const usedTokens = orders.map(o => o.token);
-    for (let i = 1; i <= 10; i++) {
-      if (!usedTokens.includes(i.toString())) {
-        setSelectedToken(i.toString());
-        break;
-      }
-    }
-  };
-
-  const pickupOrder = (orderId) => {
-    setOrders(orders.filter(order => order.id !== orderId));
+    setCartOpen(false);
   };
 
   const availableTokens = () => {
-    const usedTokens = orders.map(o => o.token);
-    return Array.from({length: 10}, (_, i) => (i + 1).toString())
-      .filter(token => !usedTokens.includes(token));
+    const used = orders.map((o) => o.token);
+    return Array.from({ length: 20 }, (_, i) => `${i + 1}`).filter(
+      (t) => !used.includes(t)
+    );
   };
 
   return (
-    <div className="min-h-screen bg-stone-50">
-      <div className="max-w-7xl mx-auto p-6">
-        {/* Header */}
-        <div className="border-b-2 border-stone-900 pb-6 mb-8">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-4xl font-serif text-stone-900 mb-2 tracking-tight">Culinary</h1>
-              <p className="text-stone-600 text-sm uppercase tracking-widest">Vendor Order System</p>
-            </div>
-            <ChefHat className="text-stone-900" size={40} strokeWidth={1.5} />
+    <div className="min-h-screen bg-stone-50 p-6">
+      <div className="max-w-[1600px] mx-auto">
+        <div className="flex justify-between items-center border-b-2 pb-4 mb-6">
+          <div>
+            <h1 className="text-3xl font-serif">Culinary</h1>
+            <p className="text-xs tracking-widest text-stone-500">
+              Vendor Order System
+            </p>
           </div>
+          <ChefHat size={32} />
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Menu Section */}
-          <div className="lg:col-span-2 space-y-8">
-            {Object.entries(menu).map(([category, items]) => (
-              <div key={category}>
-                <div className="mb-6">
-                  <h2 className="text-2xl font-serif text-stone-900 mb-1">{category}</h2>
-                  <div className="w-16 h-0.5 bg-stone-900"></div>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {items.map(item => (
-                    <div 
-                      key={item.id}
-                      className="border-2 border-stone-300 bg-white p-5 hover:border-stone-900 transition-all cursor-pointer group relative"
-                      onClick={() => addToCart(item)}
-                    >
-                      {/* Image placeholder */}
-                      <div className="w-full aspect-[4/3] bg-stone-100 border border-stone-300 mb-4 flex items-center justify-center text-6xl">
-                        {item.image}
-                      </div>
-                      
-                      <div className="space-y-3">
-                        <div className="flex justify-between items-start">
-                          <h3 className="font-serif text-lg text-stone-900 leading-tight pr-2">
-                            {item.name}
-                          </h3>
-                          <Button 
-                            size="icon"
-                            className="bg-stone-900 hover:bg-stone-700 h-9 w-9 flex-shrink-0"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              addToCart(item);
-                            }}
-                          >
-                            <Plus size={18} />
-                          </Button>
-                        </div>
-                        
-                        <p className="text-stone-600 text-sm leading-relaxed font-light">
-                          {item.desc}
-                        </p>
-                        
-                        <div className="flex items-center justify-between pt-2">
-                          <span className="text-stone-900 font-medium tracking-wide">
-                            ₹{item.price}
-                          </span>
-                          {cart.find(c => c.id === item.id) && (
-                            <Badge variant="outline" className="text-stone-900 border-stone-900 font-normal">
-                              In cart: {cart.find(c => c.id === item.id).quantity}
-                            </Badge>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
+        {Object.entries(menu).map(([category, items]) => (
+          <div key={category} className="mb-10">
+            <h2 className="text-xl font-serif mb-3">{category}</h2>
 
-          {/* Cart Section */}
-          <div className="space-y-6">
-            <div className="border-2 border-stone-900 bg-white p-6 sticky top-6">
-              <div className="flex items-center justify-between mb-6 pb-4 border-b border-stone-300">
-                <h2 className="text-xl font-serif text-stone-900">Current Order</h2>
-                {cart.length > 0 && (
-                  <Badge className="bg-stone-900 hover:bg-stone-700 font-normal">
-                    {cart.reduce((sum, item) => sum + item.quantity, 0)} items
-                  </Badge>
-                )}
-              </div>
-
-              {cart.length === 0 ? (
-                <div className="text-center py-16">
-                  <ShoppingCart className="mx-auto text-stone-300 mb-3" size={48} strokeWidth={1.5} />
-                  <p className="text-stone-400 font-light">Cart is empty</p>
-                  <p className="text-sm text-stone-400 mt-1 font-light">Add items to begin</p>
-                </div>
-              ) : (
-                <>
-                  <div className="space-y-4 max-h-96 overflow-y-auto pr-2 mb-6">
-                    {cart.map(item => (
-                      <div key={item.id} className="border border-stone-300 p-4 bg-stone-50">
-                        <div className="flex justify-between items-start mb-3">
-                          <div className="flex-1">
-                            <h4 className="font-serif text-stone-900">{item.name}</h4>
-                            <p className="text-xs text-stone-500 mt-1">₹{item.price} each</p>
-                          </div>
-                          <Button 
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-stone-500 hover:text-stone-900 hover:bg-stone-200"
-                            onClick={() => removeFromCart(item.id)}
-                          >
-                            <Trash2 size={16} />
-                          </Button>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <div className="flex items-center gap-2 border border-stone-300 bg-white">
-                            <Button 
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 hover:bg-stone-100"
-                              onClick={() => updateQuantity(item.id, -1)}
-                            >
-                              <Minus size={14} />
-                            </Button>
-                            <span className="w-8 text-center font-medium text-sm">{item.quantity}</span>
-                            <Button 
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 hover:bg-stone-100"
-                              onClick={() => updateQuantity(item.id, 1)}
-                            >
-                              <Plus size={14} />
-                            </Button>
-                          </div>
-                          <span className="font-medium text-stone-900">
-                            ₹{item.price * item.quantity}
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="border-t-2 border-stone-900 pt-6 space-y-6">
-                    <div className="flex justify-between items-center">
-                      <span className="text-stone-700 uppercase tracking-wider text-sm">Total</span>
-                      <span className="text-2xl font-serif text-stone-900">
-                        ₹{getCartTotal()}
-                      </span>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm text-stone-700 mb-2 uppercase tracking-wider">
-                        Token Number
-                      </label>
-                      <Select value={selectedToken} onValueChange={setSelectedToken}>
-                        <SelectTrigger className="w-full border-2 border-stone-300 h-12 font-medium">
-                          <SelectValue placeholder="Select token" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {availableTokens().map(token => (
-                            <SelectItem key={token} value={token}>
-                              Token {token}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <Button 
-                      onClick={placeOrder}
-                      className="w-full bg-stone-900 hover:bg-stone-700 text-white font-medium py-6 text-base uppercase tracking-widest"
-                      size="lg"
-                    >
-                      Place Order
-                    </Button>
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Active Orders */}
-        {orders.length > 0 && (
-          <div className="mt-12 pt-8 border-t-2 border-stone-900">
-            <div className="mb-6">
-              <h2 className="text-2xl font-serif text-stone-900 mb-1">Active Orders</h2>
-              <div className="w-16 h-0.5 bg-stone-900"></div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {orders.map(order => (
-                <div key={order.id} className="border-2 border-stone-900 bg-white p-6">
-                  <div className="flex justify-between items-start mb-6 pb-4 border-b border-stone-300">
-                    <div>
-                      <div className="bg-stone-900 text-white font-serif text-2xl px-4 py-2 inline-block mb-2">
-                        Token {order.token}
-                      </div>
-                      <p className="text-xs text-stone-500 uppercase tracking-wider">{order.timestamp}</p>
-                    </div>
-                    <Button 
-                      onClick={() => pickupOrder(order.id)}
-                      className="bg-stone-900 hover:bg-stone-700"
-                      size="icon"
-                      title="Mark as picked up"
-                    >
-                      <Check size={20} />
-                    </Button>
-                  </div>
-                  
-                  <div className="space-y-2 mb-6">
-                    {order.items.map((item, idx) => (
-                      <div key={idx} className="flex justify-between text-sm">
-                        <span className="text-stone-700 font-light">
-                          {item.name} <span className="text-stone-500">×{item.quantity}</span>
-                        </span>
-                        <span className="font-medium text-stone-900">₹{item.price * item.quantity}</span>
-                      </div>
-                    ))}
-                  </div>
-                  
-                  <div className="border-t-2 border-stone-900 pt-4 flex justify-between items-center">
-                    <span className="text-stone-700 uppercase tracking-wider text-sm">Total</span>
-                    <span className="text-xl font-serif text-stone-900">
-                      ₹{order.total}
-                    </span>
+            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-3">
+              {items.map((item) => (
+                <div
+                  key={item.id}
+                  onClick={() => addToCart(item)}
+                  className="border p-2 bg-white cursor-pointer hover:border-stone-900"
+                >
+                  <div className="aspect-square bg-stone-100 mb-2" />
+                  <h3 className="text-xs font-medium truncate">{item.name}</h3>
+                  <p className="text-[10px] text-stone-500 truncate">{item.desc}</p>
+                  <div className="flex justify-between items-center mt-1">
+                    <span className="text-xs">₹{item.price}</span>
+                    {cart.find((c) => c.id === item.id) && (
+                      <Badge variant="outline" className="text-[10px]">
+                        {cart.find((c) => c.id === item.id).quantity}
+                      </Badge>
+                    )}
                   </div>
                 </div>
               ))}
             </div>
           </div>
-        )}
+        ))}
       </div>
+
+      {/* Floating Cart Button */}
+      <div
+        onClick={() => setCartOpen(true)}
+        className="fixed bottom-6 right-6 bg-black text-white px-4 py-2 rounded-full flex items-center gap-2 cursor-pointer shadow-lg"
+      >
+        <ShoppingCart size={16} />
+        {cart.length} items
+      </div>
+
+      {/* Drawer */}
+      {cartOpen && (
+        <div className="fixed inset-0 bg-black/40 flex justify-end z-50">
+          <div className="bg-white w-full sm:w-[400px] h-full p-4 flex flex-col">
+            <div className="flex justify-between mb-4">
+              <h2 className="text-lg font-serif">Current Order</h2>
+              <X onClick={() => setCartOpen(false)} className="cursor-pointer" />
+            </div>
+
+            <div className="flex-1 overflow-y-auto space-y-3">
+              {cart.map((item) => (
+                <div key={item.id} className="border p-2">
+                  <div className="flex justify-between text-sm">
+                    {item.name}
+                    <Trash2 size={14} onClick={() => removeFromCart(item.id)} className="cursor-pointer" />
+                  </div>
+                  <div className="flex justify-between items-center mt-2">
+                    <div className="flex gap-2 items-center">
+                      <Button size="icon" onClick={() => updateQuantity(item.id, -1)}>
+                        <Minus size={12} />
+                      </Button>
+                      {item.quantity}
+                      <Button size="icon" onClick={() => updateQuantity(item.id, 1)}>
+                        <Plus size={12} />
+                      </Button>
+                    </div>
+                    ₹{item.price * item.quantity}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="border-t pt-3 space-y-3">
+              <div className="flex justify-between font-medium">
+                <span>Total</span>
+                <span>₹{total}</span>
+              </div>
+
+              <Select value={selectedToken} onValueChange={setSelectedToken}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Token" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableTokens().map((t) => (
+                    <SelectItem key={t} value={t}>
+                      Token {t}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Button className="w-full" onClick={placeOrder}>
+                Place Order
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
