@@ -101,6 +101,249 @@ const RestaurantVendorUI = () => {
   const getQty = (id) => cart.find((c) => c.id === id)?.quantity || 0;
 
   return (
+    <div className="min-h-screen bg-[#f8f9fb] p-6">
+      <div className="max-w-[1400px] mx-auto">
+
+        {/* Header */}
+        <div className="flex justify-between items-center mb-8">
+          <div>
+            <h1 className="text-3xl font-semibold text-gray-900">
+              Culinary
+            </h1>
+            <p className="text-sm text-gray-500">
+              Vendor Order System
+            </p>
+          </div>
+          <ChefHat size={32} className="text-gray-700" />
+        </div>
+
+        {/* Menu */}
+        {Object.entries(menu).map(([category, items]) => (
+          <div key={category} className="mb-10">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">
+              {category}
+            </h2>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+              {items.map((item) => (
+                <div
+                  key={item.id}
+                  className="
+                    bg-white
+                    rounded-2xl
+                    px-4 py-3
+                    flex items-center gap-4
+                    shadow-md
+                    hover:shadow-lg
+                    transition
+                  "
+                >
+                  <div className="w-16 h-16 bg-gray-200 rounded-xl flex-shrink-0" />
+
+                  <div className="flex-1">
+                    <div className="text-sm font-medium text-gray-900 leading-snug">
+                      {item.name}
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col items-end gap-2">
+                    <span className="text-sm font-semibold text-gray-900">
+                      ₹{item.price}
+                    </span>
+
+                    <div className="flex items-center bg-gray-100 rounded-full px-3 py-1 gap-3">
+                      <button onClick={() => decreaseItem(item)}>
+                        <Minus size={12} />
+                      </button>
+
+                      <span className="text-xs w-3 text-center">
+                        {getQty(item.id)}
+                      </span>
+
+                      <button onClick={() => addToCart(item)}>
+                        <Plus size={12} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+
+        {/* Active Orders */}
+        {orders.length > 0 && (
+          <div className="mt-12">
+            <h2 className="text-lg font-semibold mb-4">Active Orders</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {orders.map((o) => (
+                <div key={o.id} className="bg-white rounded-xl shadow p-4 text-sm">
+                  <div className="flex justify-between mb-2">
+                    <span className="font-medium">Token {o.token}</span>
+                    <Check
+                      size={16}
+                      className="cursor-pointer"
+                      onClick={() => completeOrder(o.id)}
+                    />
+                  </div>
+
+                  {o.items.map((i) => (
+                    <div key={i.id} className="flex justify-between text-gray-600 text-xs">
+                      <span>{i.name} × {i.quantity}</span>
+                      <span>₹{i.price * i.quantity}</span>
+                    </div>
+                  ))}
+
+                  <div className="border-t mt-3 pt-2 flex justify-between font-medium text-sm">
+                    <span>Total</span>
+                    <span>₹{o.total}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Floating Cart */}
+      <div
+        onClick={() => setCartOpen(true)}
+        className="
+          fixed bottom-6 right-6
+          bg-gray-900 text-white
+          px-5 py-3
+          rounded-full
+          shadow-lg
+          flex gap-2
+          cursor-pointer
+        "
+      >
+        <ShoppingCart size={16} /> {cart.length}
+      </div>
+
+      {/* Cart Drawer */}
+      {cartOpen && (
+        <div className="fixed inset-0 bg-black/40 flex justify-end z-50">
+          <div className="bg-white w-full sm:w-[400px] h-full p-5 flex flex-col shadow-xl">
+            <div className="flex justify-between mb-4">
+              <h2 className="font-semibold text-lg">Current Order</h2>
+              <X onClick={() => setCartOpen(false)} className="cursor-pointer" />
+            </div>
+
+            <div className="flex-1 overflow-y-auto space-y-3 text-sm">
+              {cart.map((item) => (
+                <div key={item.id} className="border rounded-lg p-3">
+                  <div className="flex justify-between mb-1">
+                    {item.name}
+                    <Trash2
+                      size={14}
+                      className="cursor-pointer"
+                      onClick={() => decreaseItem(item)}
+                    />
+                  </div>
+                  Qty: {item.quantity} — ₹{item.price * item.quantity}
+                </div>
+              ))}
+            </div>
+
+            <div className="border-t pt-4 space-y-3">
+              <div className="flex justify-between font-medium">
+                <span>Total</span>
+                <span>₹{total}</span>
+              </div>
+
+              <Select value={selectedToken} onValueChange={setSelectedToken}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Token" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableTokens().map((t) => (
+                    <SelectItem key={t} value={t}>
+                      Token {t}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Button onClick={placeOrder} className="w-full">
+                Place Order
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default RestaurantVendorUI;
+    ],
+    'Main Course': [
+      { id: 10, name: 'Butter Chicken', price: 280 },
+      { id: 11, name: 'Dal Makhani', price: 180 },
+      { id: 12, name: 'Paneer Butter Masala', price: 240 },
+      { id: 13, name: 'Veg Biryani', price: 210 },
+      { id: 14, name: 'Chicken Biryani', price: 260 },
+      { id: 15, name: 'Rajma Chawal', price: 170 },
+      { id: 16, name: 'Chole Bhature', price: 160 },
+      { id: 17, name: 'Egg Curry', price: 150 },
+    ],
+    Beverages: [
+      { id: 18, name: 'Cold Coffee', price: 120 },
+      { id: 19, name: 'Lassi', price: 80 },
+      { id: 20, name: 'Lemon Soda', price: 60 },
+      { id: 21, name: 'Water', price: 20 },
+      { id: 22, name: 'Tea', price: 20 },
+      { id: 23, name: 'Coffee', price: 30 },
+    ],
+  };
+
+  const addToCart = (item) => {
+    const found = cart.find((c) => c.id === item.id);
+    if (found) {
+      setCart(cart.map((c) =>
+        c.id === item.id ? { ...c, quantity: c.quantity + 1 } : c
+      ));
+    } else {
+      setCart([...cart, { ...item, quantity: 1 }]);
+    }
+  };
+
+  const decreaseItem = (item) => {
+    const found = cart.find((c) => c.id === item.id);
+    if (!found) return;
+    if (found.quantity === 1) {
+      setCart(cart.filter((c) => c.id !== item.id));
+    } else {
+      setCart(cart.map((c) =>
+        c.id === item.id ? { ...c, quantity: c.quantity - 1 } : c
+      ));
+    }
+  };
+
+  const total = cart.reduce((sum, i) => sum + i.price * i.quantity, 0);
+
+  const placeOrder = () => {
+    if (!cart.length) return;
+    setOrders([...orders, { id: Date.now(), token: selectedToken, items: cart, total }]);
+    setCart([]);
+    setCartOpen(false);
+  };
+
+  const completeOrder = (id) => {
+    setOrders(orders.filter((o) => o.id !== id));
+  };
+
+  const availableTokens = () => {
+    const used = orders.map((o) => o.token);
+    return Array.from({ length: 20 }, (_, i) => `${i + 1}`).filter(
+      (t) => !used.includes(t)
+    );
+  };
+
+  const getQty = (id) => cart.find((c) => c.id === id)?.quantity || 0;
+
+  return (
     <div className="min-h-screen bg-stone-50 p-6">
       <div className="max-w-[1400px] mx-auto">
         <div className="flex justify-between items-center border-b pb-4 mb-6">
