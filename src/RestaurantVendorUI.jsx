@@ -20,12 +20,11 @@ import {
   BarChart3,
   ArrowLeft,
   Calendar as CalendarIcon,
-  RefreshCcw,
-  ChevronRight
+  ChevronRight,
+  TrendingUp
 } from 'lucide-react';
 
 // --- HELPER: Get Local Date String (YYYY-MM-DD) ---
-// Prevents Timezone bugs where "Today" shows as yesterday
 const getLocalDate = () => {
   const now = new Date();
   const offset = now.getTimezoneOffset() * 60000;
@@ -67,13 +66,13 @@ export default function RestaurantVendorUI() {
   
   const [nextIdCounter, setNextIdCounter] = useState(1);
   const [isDarkMode, setIsDarkMode] = useState(() => localStorage.getItem('pos_theme') === 'dark');
-  const [currentView, setCurrentView] = useState('POS'); // 'POS' or 'REPORT'
+  const [currentView, setCurrentView] = useState('POS'); 
   const [reportDate, setReportDate] = useState(getLocalDate());
 
   const [cart, setCart] = useState([]);
   const [selectedToken, setSelectedToken] = useState('');
   const [discount, setDiscount] = useState(0); 
-  const taxRate = 5; // Global GST Rate
+  const taxRate = 5; 
 
   // Panel States
   const [ordersOpen, setOrdersOpen] = useState(false);
@@ -400,7 +399,6 @@ export default function RestaurantVendorUI() {
 
   // --- RENDER COMPONENT: REPORT DASHBOARD ---
   const SalesReport = () => {
-    // 1. Filter Logic (Using LOCAL time comparison)
     const allOrders = [...orders, ...history];
     const filteredOrders = allOrders.filter(o => {
       const d = new Date(o.startedAt);
@@ -409,21 +407,30 @@ export default function RestaurantVendorUI() {
       return localYMD === reportDate;
     }).sort((a, b) => b.startedAt - a.startedAt);
 
-    // 2. Stats Logic
+    // --- CHART DATA GENERATION ---
+    const chartData = useMemo(() => {
+        const hours = Array(24).fill(0);
+        filteredOrders.forEach(o => {
+            const d = new Date(o.startedAt);
+            const h = d.getHours();
+            hours[h] += Number(o.total || 0); // Ensure it treats as number
+        });
+        return hours;
+    }, [filteredOrders]);
+
+    const maxSales = Math.max(...chartData, 1); // Avoid div by zero
+
     const totalRevenue = filteredOrders.reduce((sum, o) => sum + o.total, 0);
     const totalCash = filteredOrders.filter(o => o.payment?.method === 'CASH').reduce((sum, o) => sum + o.total, 0);
     const totalUPI = filteredOrders.filter(o => o.payment?.method === 'UPI').reduce((sum, o) => sum + o.total, 0);
     const totalCard = filteredOrders.filter(o => o.payment?.method === 'CARD').reduce((sum, o) => sum + o.total, 0);
 
-    // REPORT REFS
     const backBtnRef = useRef(null);
     const dateInputRef = useRef(null);
     const exportBtnRef = useRef(null);
 
-    // Auto-focus Back button on mount
     useEffect(() => { setTimeout(() => backBtnRef.current?.focus(), 50); }, []);
 
-    // REPORT NAVIGATION
     const handleReportNav = (e, type) => {
         if (e.key === 'Backspace') { setCurrentView('POS'); }
         if (type === 'BACK') { if (e.key === 'ArrowRight') dateInputRef.current?.focus(); }
@@ -436,7 +443,6 @@ export default function RestaurantVendorUI() {
 
     return (
         <div className={`h-full flex flex-col p-4 md:p-6 overflow-hidden ${theme.bgMain} ${theme.textMain}`}>
-            {/* Header */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-4">
                 <div className="flex items-center gap-4">
                     <button ref={backBtnRef} onKeyDown={(e) => handleReportNav(e, 'BACK')} onClick={() => setCurrentView('POS')} className={`p-2 rounded-full ${theme.bgHover} border ${theme.border} outline-none focus:ring-2 focus:ring-blue-500`}>
@@ -456,7 +462,7 @@ export default function RestaurantVendorUI() {
                 </div>
             </div>
 
-            {/* Stats Grid */}
+            {/* --- STATS GRID --- */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
                 <div className={`${theme.bgCard} p-3 md:p-4 rounded-xl border ${theme.border} shadow-sm`}>
                     <div className={`${theme.textSec} text-xs md:text-sm`}>Total Revenue</div>
@@ -479,11 +485,36 @@ export default function RestaurantVendorUI() {
                 </div>
             </div>
 
-            {/* Transactions Table */}
+            {/* --- HOURLY SALES CHART (FIXED) --- */}
+            <div className={`mb-4 rounded-xl border ${theme.border} ${theme.bgCard} p-4`}>
+                <div className="flex items-center gap-2 mb-4">
+                    <TrendingUp size={18} className="text-blue-500"/>
+                    <h2 className="font-bold text-sm">Hourly Sales Performance</h2>
+                </div>
+                <div className="h-32 md:h-48 flex gap-1 md:gap-2"> {/* Removed items-end, keeping standard flex */}
+                    {chartData.map((val, h) => (
+                        <div key={h} className="flex-1 flex flex-col justify-end items-center gap-1 group relative h-full"> {/* justify-end pushes bars to bottom, h-full fills container */}
+                            {/* Tooltip */}
+                            <div className="absolute bottom-full mb-1 hidden group-hover:block bg-black text-white text-xs px-2 py-1 rounded shadow-lg whitespace-nowrap z-10">
+                                {h}:00 - ₹{val}
+                            </div>
+                            {/* Bar - Height is relative to the FULL chart height now */}
+                            <div 
+                                className={`w-full rounded-t-sm transition-all duration-500 ${val > 0 ? 'bg-blue-500 hover:bg-blue-400' : 'bg-transparent'}`} 
+                                style={{height: `${(val / maxSales) * 100}%`, minHeight: val > 0 ? '4px' : '0'}}
+                            ></div>
+                            {/* Label */}
+                            <span className={`text-[9px] md:text-[10px] ${theme.textSec} ${h % 3 !== 0 ? 'hidden md:block' : 'block'}`}>
+                                {h}
+                            </span>
+                        </div>
+                    ))}
+                </div>
+            </div>
+
             <div className={`flex-1 overflow-hidden rounded-xl border ${theme.border} ${theme.bgCard} flex flex-col`}>
                 <div className={`p-3 border-b ${theme.border} flex justify-between items-center bg-opacity-50 ${isDarkMode ? 'bg-slate-800' : 'bg-stone-50'}`}>
                     <h2 className="font-bold flex items-center gap-2"><Banknote size={18}/> <span className="hidden md:inline">Transaction History</span><span className="md:hidden">History</span></h2>
-                    <button onClick={() => setReportDate(getLocalDate())} className={`text-xs flex items-center gap-1 ${theme.textSec} hover:text-blue-500`}><RefreshCcw size={12}/> Reset</button>
                 </div>
                 <div className="flex-1 overflow-y-auto focus:ring-2 focus:ring-inset focus:ring-blue-500 outline-none" tabIndex={0}>
                     <table className="w-full text-sm text-left">
@@ -553,7 +584,17 @@ export default function RestaurantVendorUI() {
                                 <label className="block text-xs font-bold text-stone-400 uppercase mb-1">Cash Received</label>
                                 <div className="relative">
                                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xl font-bold text-stone-400">₹</span>
-                                    <input ref={cashInputRef} type="number" value={cashReceived} onChange={(e) => setCashReceived(e.target.value)} className={`w-full pl-8 pr-4 py-3 text-2xl font-bold ${theme.bgCard} ${theme.textMain} ${theme.border} border rounded-xl focus:ring-4 focus:ring-blue-500 outline-none`} placeholder="0"/>
+                                    <input 
+                                        ref={cashInputRef} 
+                                        type="number" 
+                                        min="0"
+                                        value={cashReceived} 
+                                        onChange={(e) => {
+                                            if(Number(e.target.value) >= 0) setCashReceived(e.target.value);
+                                        }} 
+                                        className={`w-full pl-8 pr-4 py-3 text-2xl font-bold ${theme.bgCard} ${theme.textMain} ${theme.border} border rounded-xl focus:ring-4 focus:ring-blue-500 outline-none`} 
+                                        placeholder="0"
+                                    />
                                 </div>
                             </div>
                             <div className={`flex justify-between items-center pt-2 border-t border-dashed ${theme.border}`}>
