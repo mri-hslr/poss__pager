@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import RestaurantVendorUI from './components/ui/RestaurantVendorUI.jsx';
 
@@ -52,5 +53,17 @@ function App() {
     </ErrorBoundary>
   );
 }
+import { useState } from "react";
+import RestaurantVendorUI from "./RestaurantVendorUI";
+import Auth from "./pages/Auth";
 
-export default App;
+function App() {
+  const [authenticated, setAuthenticated] = useState(
+    !!localStorage.getItem("token")
+  );
+
+  return authenticated ?(
+     <RestaurantVendorUI onLogout={() => setAuthenticated(false)}/>)
+    : (<Auth onAuthSuccess={() => setAuthenticated(true)} />);
+}
+export default App
