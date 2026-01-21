@@ -1,19 +1,19 @@
-const mysql=require("mysql2");
+const mysql = require('mysql');
 
-const pool=mysql.createPool({
-    host:'localhost',
-    user:'root',
-    password:'323112rm',
-    database:'pos_db',
-    socketPath: "/tmp/mysql.sock"
-        
+const db = mysql.createConnection({
+  host: '127.0.0.1',       // <--- IMPORTANT: This forces Windows to work
+  user: 'root',            // Default XAMPP user
+  password: '',            // Default XAMPP password is empty
+  database: 'pos_db',      // Your database name
+  port: 3306               // Default XAMPP port
 });
-pool.getConnection((err,connection)=>{
-    if(err){
-        console.error('Error connecting to the database:',err);
-    }else{
-        console.log('Connected to the database');
-        connection.release();
-    }
+
+db.connect((err) => {
+  if (err) {
+    console.error('Error connecting to the database:', err);
+    return;
+  }
+  console.log('Connected to MySQL database!');
 });
-module.exports=pool
+
+module.exports = db;

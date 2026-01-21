@@ -7,36 +7,16 @@ import OrderTimer from './OrderTimer';
 
 export default function POSView({
   // Data
-  menuItems,
-  categories,
-  orders,
-  cart,
-  selectedToken,
-  availableTokens,
-  discount,
-  grandTotal,
-  cartSubtotal,
-  taxAmount,
-  maxDiscount,
+  menuItems, categories, orders, cart,
+  selectedToken, availableTokens, discount,
+  grandTotal, cartSubtotal, taxAmount, maxDiscount,
   // User Info
-  userRole, 
-  userName,
+  userRole, userName,
   // Actions
-  onAddToCart,
-  onRemoveFromCart,
-  onSetDiscount,
-  onSetToken,
-  onCheckout,
-  onViewOrder,
-  onOpenOrders,
-  onOpenReport,
-  onToggleTheme,
-  onLogout,
-  onAddItemClick, 
-  onEditItemClick,
-  onOpenUserManagement,
-  theme,
-  isDarkMode
+  onAddToCart, onRemoveFromCart, onSetDiscount, onSetToken,
+  onCheckout, onViewOrder, onOpenOrders, onOpenReport,
+  onToggleTheme, onLogout, onAddItemClick, onEditItemClick, onOpenUserManagement,
+  theme, isDarkMode
 }) {
   const [selectedCategory, setSelectedCategory] = useState(categories[0]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -110,12 +90,10 @@ export default function POSView({
 
   const handleGridNav = (e, index, item) => {
     const totalItems = displayItems.length;
-    // Responsive columns check (Admin view might be wider now)
     const gridCols = window.innerWidth >= 1280 ? 4 : window.innerWidth >= 1024 ? 3 : window.innerWidth >= 640 ? 2 : 1;
 
     if (e.key === 'Tab') {
       e.preventDefault();
-      // If admin, maybe loop back or go to header. If Staff, go to Checkout button
       if (userRole !== 'admin') confirmButtonRef.current?.focus();
       return;
     }
@@ -145,7 +123,6 @@ export default function POSView({
       if (item.isAddButton) {
         onAddItemClick();
       } else {
-        // ADMIN: Edit | STAFF: Add to Cart
         if (userRole === 'admin') onEditItemClick(item);
         else onAddToCart(item);
       }
@@ -205,8 +182,8 @@ export default function POSView({
                 </div>
             </div>
 
-            {/* Active Tokens Strip */}
-            {orders.length > 0 && (
+            {/* --- ACTIVE TOKENS STRIP (HIDDEN FOR ADMIN) --- */}
+            {userRole !== 'admin' && orders.length > 0 && (
                 <div className={`${isDarkMode ? 'bg-slate-900/50' : 'bg-stone-50'} border-b ${theme.border} px-4 md:px-6 py-2 overflow-x-auto whitespace-nowrap scrollbar-hide shrink-0`}>
                     <div className="flex gap-3 items-center">
                         {orders.map((o) => (
