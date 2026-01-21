@@ -1,69 +1,52 @@
-
-import React, { useState, useEffect } from 'react';
-import RestaurantVendorUI from './components/ui/RestaurantVendorUI.jsx';
-
-// 1. Simple Error Boundary Component
-class ErrorBoundary extends React.Component {
-  constructor(props) {
-    super(props);
-    this.state = { hasError: false, error: null, errorInfo: null };
-  }
-
-  static getDerivedStateFromError(error) {
-    return { hasError: true };
-  }
-
-  componentDidCatch(error, errorInfo) {
-    this.setState({ error: error, errorInfo: errorInfo });
-    console.error("React Crash:", error, errorInfo);
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div style={{ padding: '20px', color: 'red', background: '#fff' }}>
-          <h1>⚠️ Something went wrong.</h1>
-          <pre>{this.state.error && this.state.error.toString()}</pre>
-          <details style={{ whiteSpace: 'pre-wrap' }}>
-            {this.state.errorInfo && this.state.errorInfo.componentStack}
-          </details>
-        </div>
-      );
-    }
-    return this.props.children; 
-  }
-}
+import React, { useEffect, useState } from 'react';
+import LoginView from './components/ui/LoginView';
+import RestaurantVendorUI from './components/ui/RestaurantVendorUI';
 
 function App() {
-  // 2. Clear corrupted storage on load to prevent loops
+  const [user, setUser] = useState(null);
+
+  // restore session
   useEffect(() => {
     try {
-      // Just accessing this to see if it works
-      const test = localStorage.getItem('vendor_orders');
-    } catch (e) {
-      console.error("Storage Access Error:", e);
+      const saved = localStorage.getItem('auth_user');
+      if (!saved) return;
+  
+      const parsed = JSON.parse(saved);
+  
+      // validate shape
+      if (parsed && parsed.email) {
+        setUser(parsed);
+      } else {
+        localStorage.removeItem('auth_user');
+      }
+    } catch {
+      localStorage.removeItem('auth_user');
     }
   }, []);
+  
 
-  return (
-    <ErrorBoundary>
-      <div className="App min-h-screen bg-slate-950">
-        <RestaurantVendorUI />
-      </div>
-    </ErrorBoundary>
-  );
+  const handleLogin = (user) => {
+    setUser(user);
+    localStorage.setItem('auth_user', JSON.stringify(user));
+  };
+
+  const handleLogout = () => {
+    setUser(null);
+    localStorage.removeItem('auth_user');
+    localStorage.removeItem('auth_token');
+  };
+
+  const theme = {
+    bgMain: 'bg-slate-950',
+    bgCard: 'bg-slate-900',
+    textMain: 'text-white'
+  };
+
+  if (!user) {
+    return <LoginView onLogin={handleLogin} theme={theme} />;
+  }
+
+  return <RestaurantVendorUI user={user} onLogout={handleLogout} />;
 }
-import { useState } from "react";
-import RestaurantVendorUI from "./RestaurantVendorUI";
-import Auth from "./pages/Auth";
 
-function App() {
-  const [authenticated, setAuthenticated] = useState(
-    !!localStorage.getItem("token")
-  );
-
-  return authenticated ?(
-     <RestaurantVendorUI onLogout={() => setAuthenticated(false)}/>)
-    : (<Auth onAuthSuccess={() => setAuthenticated(true)} />);
-}
-export default App
+export default App;
