@@ -1,5 +1,5 @@
 const orderModel = require('../models/orderModel');
-
+const QRCode = require('qrcode');
 async function createOrder(req, res) {
   const { items, paymentMethod } = req.body;
 
@@ -23,11 +23,28 @@ async function createOrder(req, res) {
       await orderModel.addOrderItem(orderId, item);
     }
 
+    let upi = null;
+
+    if (paymentMethod === "upi") {
+      const upiId = "mridulbhardwaj13@okaxis";
+      const payeeName = "Grid Sphere";
+
+      const upiLink = `upi://pay?pa=${upiId}&pn=${encodeURIComponent(payeeName)}&am=${total}&cu=INR&tn=Order%20${orderId}&tr=ORD${orderId}`;
+
+      const qrBase64 = await QRCode.toDataURL(upiLink);
+
+        upi = {
+        link: upiLink,
+        qr: qrBase64
+        };
+    }
+
     res.json({
       message: "Order created",
       orderId,
       total,
-      paymentStatus: "pending"
+      paymentStatus: "pending",
+      upi
     });
 
   } catch (err) {
