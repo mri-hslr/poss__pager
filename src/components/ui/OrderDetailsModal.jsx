@@ -1,72 +1,50 @@
-import React, { useEffect, useRef } from 'react';
-import { X, Clock, Check } from 'lucide-react';
-import OrderTimer from './OrderTimer';
+import React from 'react';
 
-export default function OrderDetailsModal({ 
-  order, 
-  onClose, 
-  onComplete, 
-  theme 
-}) {
-  const releaseBtnRef = useRef(null);
-
-  useEffect(() => {
-    setTimeout(() => releaseBtnRef.current?.focus(), 50);
-  }, []);
-
+export default function OrderDetailsModal({ order, onClose, onComplete, isDarkMode }) {
   if (!order) return null;
 
+  // FIX: Force numeric calculation for the display
+  const total = order.items.reduce((acc, item) => acc + (Number(item.price) * (item.quantity || 1)), 0);
+
   return (
-    <div className="fixed inset-0 z-[60] flex items-end md:items-center justify-center animate-in fade-in duration-200">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div className={`relative ${theme.bgCard} w-full md:max-w-sm h-[80vh] md:h-auto rounded-t-3xl md:rounded-2xl shadow-2xl p-6 flex flex-col gap-4 mx-0 md:mx-4`}>
-        
-        {/* Header */}
-        <div className={`flex justify-between items-start border-b ${theme.border} pb-4 shrink-0`}>
-           <div>
-              <div className="flex items-center gap-2">
-                <span className="text-2xl font-black">Token {order.token}</span>
-                <span className="bg-blue-100 text-blue-700 font-bold px-2 py-1 rounded text-sm">#{order.displayId}</span>
-              </div>
-              <div className={`${theme.textSec} text-sm mt-1 flex items-center gap-2`}>
-                <Clock size={14} /> Preparing <OrderTimer startedAt={order.startedAt} />
-              </div>
-           </div>
-           <button onClick={onClose} className={`p-2 ${theme.bgHover} rounded-full ${theme.textSec}`}>
-             <X size={24} />
-           </button>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+      <div className={`w-full max-w-sm rounded-2xl shadow-2xl border ${isDarkMode ? 'bg-[#0f172a] border-slate-800' : 'bg-white border-gray-100'} p-6`}>
+        <div className="flex justify-between items-start mb-4">
+          <div>
+            <h2 className="text-xl font-bold flex items-center gap-2">
+              Token {order.token}
+              <span className="text-[10px] bg-blue-600 px-2 py-0.5 rounded uppercase">#{order.displayId}</span>
+            </h2>
+            <p className="text-slate-500 text-xs mt-1">🕒 Preparing 3:11</p>
+          </div>
+          <button onClick={onClose} className="text-slate-500 hover:text-white text-xl">&times;</button>
         </div>
 
-        {/* Items */}
-        <div className="py-2 space-y-3 overflow-y-auto flex-1">
-           {order.items.map((item) => (
-             <div key={item.id} className="flex justify-between items-center">
-                <div className="flex items-center gap-2">
-                   <div className="font-bold">{item.name}</div>
-                   <div className="text-stone-400 text-xs">x{item.quantity}</div>
-                </div>
-                <div className="font-mono">₹{item.price * item.quantity}</div>
-             </div>
-           ))}
-           <div className={`border-t border-dashed ${theme.border} my-2`}></div>
-           <div className="flex justify-between items-center text-lg font-bold">
-             <span>Total Bill</span><span>₹{order.total}</span>
-           </div>
+        <div className="border-y border-slate-800/50 py-4 my-4 space-y-3">
+          {order.items.map((item, i) => (
+            <div key={i} className="flex justify-between items-center text-sm">
+              <span>{item.name} <span className="text-slate-500 text-xs">x{item.quantity}</span></span>
+              <span className="font-semibold">₹{Number(item.price) * item.quantity}</span>
+            </div>
+          ))}
         </div>
 
-        {/* Footer Actions */}
-        <div className="pt-2 flex flex-col gap-2 shrink-0">
-           <button 
-             ref={releaseBtnRef} 
-             onClick={() => onComplete(order.id)} 
-             className="w-full py-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl flex items-center justify-center gap-2"
-           >
-             <Check size={20} /> Mark Ready
-           </button>
-           <button onClick={onClose} className={`w-full py-2 ${theme.textSec} hover:${theme.textMain} font-medium text-sm`}>
-             Close Details
-           </button>
+        {/* THE FIX: Ensure total is not blank */}
+        <div className="flex justify-between items-center font-bold text-lg mb-6">
+          <span>Total Bill</span>
+          <span>₹{total.toFixed(0)}</span>
         </div>
+
+        <button 
+          onClick={() => onComplete(order.id)}
+          className="w-full py-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl font-bold transition-all active:scale-95"
+        >
+          ✓ Mark Ready
+        </button>
+
+        <button onClick={onClose} className="w-full mt-4 text-slate-500 text-xs hover:underline">
+          Close Details
+        </button>
       </div>
     </div>
   );

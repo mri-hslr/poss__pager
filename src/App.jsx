@@ -1,43 +1,37 @@
-import React, { useEffect, useState } from 'react';
-import LoginView from './components/ui/LoginView';
+import React, { useState, useEffect } from 'react';
 import RestaurantVendorUI from './components/ui/RestaurantVendorUI';
+import LoginView from './components/ui/LoginView';
 
 function App() {
   const [user, setUser] = useState(null);
+  const [token, setToken] = useState(null);
 
-  // Restore session safely
+  // RESTORE SESSION ON REFRESH
   useEffect(() => {
-    const token = localStorage.getItem('auth_token');
+    const savedToken = localStorage.getItem('auth_token');
     const savedUser = localStorage.getItem('auth_user');
-
-    if (token && savedUser) {
-      try {
-        setUser(JSON.parse(savedUser));
-      } catch {
-        localStorage.clear();
-      }
+    if (savedToken && savedUser) {
+      setToken(savedToken);
+      setUser(JSON.parse(savedUser));
     }
   }, []);
 
-  const handleLogin = (user) => {
-    setUser(user);
-    localStorage.setItem('auth_user', JSON.stringify(user));
+  const handleLogin = (userData, tokenData) => {
+    localStorage.setItem('auth_token', tokenData);
+    localStorage.setItem('auth_user', JSON.stringify(userData));
+    setToken(tokenData);
+    setUser(userData);
   };
 
   const handleLogout = () => {
-    setUser(null);
-    localStorage.removeItem('auth_user');
     localStorage.removeItem('auth_token');
+    localStorage.removeItem('auth_user');
+    setToken(null);
+    setUser(null);
   };
 
-  const theme = {
-    bgMain: 'bg-slate-950',
-    bgCard: 'bg-slate-900',
-    textMain: 'text-white',
-  };
-
-  if (!user) {
-    return <LoginView onLogin={handleLogin} theme={theme} />;
+  if (!token) {
+    return <LoginView onLogin={handleLogin} />;
   }
 
   return <RestaurantVendorUI user={user} onLogout={handleLogout} />;

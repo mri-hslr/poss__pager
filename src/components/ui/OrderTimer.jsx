@@ -1,12 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 const OrderTimer = ({ startedAt, large = false }) => {
   const [elapsed, setElapsed] = useState(0);
 
   useEffect(() => {
-    // Safety check for invalid date
-    if (!startedAt) return;
-    
     const update = () => setElapsed(Math.floor((Date.now() - startedAt) / 1000));
     update();
     const i = setInterval(update, 1000);
