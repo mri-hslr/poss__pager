@@ -4,7 +4,7 @@ const app = express();
 const productRoutes = require('./routes/products');
 const authRoutes = require('./routes/authRoutes');
 const orderRoutes = require('./routes/orderRoutes');
-
+const settingsRoutes = require("./routes/settingsRoutes");
 const authMiddleware = require('./middleware/authMiddleware');
 const cors = require('cors');
 
@@ -18,7 +18,7 @@ app.get('/', (req, res) => {
 app.use('/auth', authRoutes);
 app.use('/products', authMiddleware, productRoutes);
 app.use('/orders', authMiddleware, orderRoutes);  // IMPORTANT
-
+app.use("/settings", authMiddleware, settingsRoutes);
 const PORT = 3000;
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);

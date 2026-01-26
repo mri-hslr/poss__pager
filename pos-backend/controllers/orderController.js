@@ -16,28 +16,42 @@ async function createOrder(req, res) {
       (sum, i) => sum + i.price * i.quantity,
       0
     );
-
+    console.log("REQ BODY:", JSON.stringify(req.body, null, 2));
     const orderId = await orderModel.createOrder(total, paymentMethod);
 
     for (const item of items) {
-      await orderModel.addOrderItem(orderId, item);
-    }
-
+        const normalizedItem = {
+          productId: item.productId ?? item.id,   // ✅ THIS IS THE FIX
+          name: item.name,
+          price: item.price,
+          quantity: item.quantity
+        };
+      
+        if (!normalizedItem.productId) {
+          console.error("🚨 Invalid item:", item);
+          throw new Error("Missing productId");
+        }
+      
+        await orderModel.addOrderItem(orderId, normalizedItem);
+      }
     let upi = null;
 
     if (paymentMethod === "upi") {
-      const upiId = "mridulbhardwaj13@okaxis";
-      const payeeName = "Grid Sphere";
-
-      const upiLink = `upi://pay?pa=${upiId}&pn=${encodeURIComponent(payeeName)}&am=${total}&cu=INR&tn=Order%20${orderId}&tr=ORD${orderId}`;
-
-      const qrBase64 = await QRCode.toDataURL(upiLink);
-
+        const settings = await settingsModel.getSettings();
+      
+        if (!settings?.upi_id || !settings?.payee_name) {
+          return res.status(500).json({ message: "UPI not configured" });
+        }
+      
+        const upiLink = `upi://pay?pa=${settings.upi_id}&pn=${encodeURIComponent(settings.payee_name)}&am=${total}&cu=INR&tn=Order%20${orderId}&tr=ORD${orderId}`;
+      
+        const qrBase64 = await QRCode.toDataURL(upiLink);
+      
         upi = {
-        link: upiLink,
-        qr: qrBase64
+          link: upiLink,
+          qr: qrBase64
         };
-    }
+      }
 
     res.json({
       message: "Order created",
