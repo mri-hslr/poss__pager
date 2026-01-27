@@ -1,153 +1,179 @@
-import React from 'react';
-import { Settings, Plus, Minus, Search, LogOut } from 'lucide-react';
+import React, { useState } from 'react';
+import { Search, Monitor, LogOut, X, ChefHat, RotateCw } from 'lucide-react';
 
-const POSView = ({ 
-    menu, categories, cart, orders, 
-    selectedCategory, setSelectedCategory,
-    availableTokens, selectedToken, onSetToken,
-    onAddToCart, onRemoveFromCart, 
-    onCheckout, onLogout,
-    userRole, isDarkMode, onToggleTheme,
-    onOpenOrders, onOpenReport,
-    onViewOrder, discount, setDiscount,
-    onAddItem, onEditItem, onOpenSettings
-}) => {
+export default function POSView({ 
+  menu = {}, 
+  categories = [], 
+  cart = [], 
+  orders = [], 
+  selectedCategory, 
+  setSelectedCategory, 
+  availableTokens, 
+  selectedToken, 
+  onSetToken, 
+  onAddToCart, 
+  onRemoveFromCart, 
+  onCheckout, 
+  onLogout, // 👈 LOGOUT FUNCTION IS HERE
+  userRole, 
+  isDarkMode, 
+  onToggleTheme,
+  discount,
+  setDiscount,
+  taxRate,
+  onOpenSettings,
+  onMarkReady,
+  onCallCustomer
+}) {
+  const [searchTerm, setSearchTerm] = useState("");
+  const [showLeftSidebar, setShowLeftSidebar] = useState(false);
 
-    const cartSubtotal = cart.reduce((s, i) => s + (Number(i.price) * i.quantity), 0);
-    const taxAmount = 0; // Keeping simple as per your screenshot
-    const grandTotal = Math.max(0, cartSubtotal - Number(discount));
+  // Safety fallback if menu is undefined
+  const products = menu[selectedCategory] || [];
+  const filteredProducts = products.filter(p => 
+      p.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
-    const themeClass = isDarkMode ? 'bg-[#0f172a] text-white' : 'bg-white text-gray-900';
-    const borderClass = isDarkMode ? 'border-slate-800' : 'border-gray-200';
-    const cardClass = isDarkMode ? 'bg-[#1e293b] border-slate-700' : 'bg-white border-gray-200';
+  const cartSubtotal = cart.reduce((s, i) => s + i.price * i.quantity, 0);
+  const afterDiscount = Math.max(0, cartSubtotal - Number(discount));
+  const taxAmount = afterDiscount * (taxRate / 100);
+  const grandTotal = Math.round(afterDiscount + taxAmount);
 
-    return (
-        <div className={`flex h-screen ${themeClass}`}>
-            {/* Left: Menu Area */}
-            <div className={`flex-1 flex flex-col overflow-hidden border-r ${borderClass}`}>
-                <header className={`p-4 border-b ${borderClass} flex justify-between items-center`}>
-                    <div className="flex items-center gap-4">
-                        <h1 className="text-xl font-bold">POS Terminal</h1>
-                        <div className="flex bg-gray-100 rounded-lg p-1">
-                            {categories.map(cat => (
-                                <button
-                                    key={cat}
-                                    onClick={() => setSelectedCategory(cat)}
-                                    className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${selectedCategory === cat ? 'bg-black text-white shadow' : 'text-gray-500 hover:text-black'}`}
-                                >
-                                    {cat}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        {userRole === 'admin' && (
-                             <button onClick={onOpenSettings} className="p-2 hover:bg-gray-100 rounded-full text-gray-600">
-                                <Settings size={20} />
-                             </button>
-                        )}
-                        <div className="relative">
-                            <Search className="absolute left-3 top-2.5 text-gray-400" size={16} />
-                            <input type="text" placeholder="Search (Ctrl+F)" className="pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm w-64 outline-none focus:border-blue-500" />
-                        </div>
-                    </div>
-                </header>
+  const bgMain = isDarkMode ? "bg-slate-900" : "bg-slate-50";
+  const bgCard = isDarkMode ? "bg-slate-800 border-slate-700" : "bg-white border-slate-200";
+  const textMain = isDarkMode ? "text-white" : "text-slate-900";
+  const textSub = isDarkMode ? "text-slate-400" : "text-slate-500";
+  const inputBg = isDarkMode ? "bg-slate-700 border-slate-600 text-white" : "bg-white border-slate-200 text-slate-900";
 
-                <div className="flex-1 overflow-y-auto p-6 bg-gray-50/50">
-                    <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                        {(menu[selectedCategory] || []).map(item => (
-                            <div 
-                                key={item.id} 
-                                onClick={() => onAddToCart(item)}
-                                className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm cursor-pointer hover:shadow-md hover:border-blue-500 transition-all h-40 flex flex-col justify-between group"
-                            >
-                                <h3 className="font-bold text-gray-800">{item.name}</h3>
-                                <p className="text-gray-500 text-sm">₹{item.price}</p>
-                            </div>
-                        ))}
-                    </div>
-                </div>
+  return (
+    <div className={`flex h-full w-full absolute inset-0 ${bgMain} ${textMain}`}>
+      
+      {/* LEFT SIDEBAR (Kitchen) */}
+      {showLeftSidebar && (
+        <>
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm z-40" onClick={() => setShowLeftSidebar(false)}></div>
+          <div className={`absolute inset-y-0 left-0 w-80 shadow-2xl z-50 p-4 flex flex-col transition-transform duration-300 animate-in slide-in-from-left ${isDarkMode ? 'bg-slate-900 border-r border-slate-700' : 'bg-white border-r border-slate-200'}`}>
+            <div className="flex justify-between items-center mb-6">
+               <h2 className={`text-xl font-black flex items-center gap-2 ${textMain}`}><ChefHat/> Kitchen</h2>
+               <button onClick={() => setShowLeftSidebar(false)} className="p-1 rounded hover:bg-slate-100/10"><X size={20}/></button>
             </div>
-
-            {/* Right: Cart Area */}
-            <div className="w-[400px] flex flex-col bg-white">
-                <div className={`p-4 border-b ${borderClass} flex justify-between items-center bg-gray-50/50`}>
-                    <h2 className="font-bold text-lg">Cart</h2>
-                    <div className="flex items-center gap-3">
-                         <select 
-                            value={selectedToken} 
-                            onChange={(e) => onSetToken(e.target.value)}
-                            className="bg-white border border-gray-200 text-sm rounded-lg px-3 py-1.5 outline-none font-bold shadow-sm"
-                        >
-                            {availableTokens.map(t => <option key={t} value={t}>Token {t}</option>)}
-                        </select>
-                         <button onClick={onLogout} className="text-red-500 p-2 hover:bg-red-50 rounded-lg">
-                            <LogOut size={18} />
-                         </button>
+            <div className="flex-1 overflow-y-auto space-y-4">
+              {orders.map(order => (
+                <div key={order.id} className={`p-4 rounded-xl border relative group ${bgCard}`}>
+                    <div className="flex justify-between font-bold mb-2">
+                       <span>Token #{order.token}</span>
+                       <span className="text-xs font-mono opacity-50">{new Date(order.startedAt).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
                     </div>
-                </div>
-
-                <div className="flex-1 overflow-y-auto p-4 space-y-3">
-                    {cart.length === 0 ? (
-                        <div className="h-full flex flex-col items-center justify-center text-gray-400">
-                            <p>Cart is empty</p>
-                        </div>
-                    ) : cart.map(item => (
-                        <div key={item.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-xl border border-gray-100">
-                            <div>
-                                <p className="font-bold text-sm text-gray-800">{item.name}</p>
-                                <p className="text-blue-600 font-bold text-xs">₹{item.price * item.quantity}</p>
-                            </div>
-                            {/* ✅ RESTORED: Plus/Minus Buttons */}
-                            <div className="flex items-center gap-3 bg-white border border-gray-200 rounded-lg px-2 py-1 shadow-sm">
-                                <button onClick={() => onRemoveFromCart(item)} className="w-6 h-6 flex items-center justify-center text-gray-500 hover:text-red-500 hover:bg-red-50 rounded transition-colors">
-                                    <Minus size={14} />
-                                </button>
-                                <span className="font-bold text-sm w-4 text-center">{item.quantity}</span>
-                                <button onClick={() => onAddToCart(item)} className="w-6 h-6 flex items-center justify-center text-gray-500 hover:text-blue-500 hover:bg-blue-50 rounded transition-colors">
-                                    <Plus size={14} />
-                                </button>
-                            </div>
-                        </div>
+                    {order.items.map((item, idx) => (
+                       <div key={idx} className={`text-sm ${textSub}`}>{item.quantity}x {item.name}</div>
                     ))}
-                </div>
-
-                {/* ✅ RESTORED: Discount Input & Totals */}
-                <div className="p-6 bg-gray-50 border-t border-gray-200">
-                    <div className="space-y-3 mb-4 text-sm">
-                        <div className="flex justify-between text-gray-500">
-                            <span>Subtotal</span>
-                            <span>₹{cartSubtotal}</span>
-                        </div>
-                        <div className="flex justify-between items-center text-gray-500">
-                            <span>Discount</span>
-                            <div className="flex items-center gap-1 border-b border-gray-300">
-                                <span>- ₹</span>
-                                <input 
-                                    type="number" 
-                                    value={discount} 
-                                    onChange={(e) => setDiscount(Number(e.target.value))}
-                                    className="w-12 bg-transparent text-right outline-none font-medium text-red-500"
-                                />
-                            </div>
-                        </div>
-                        <div className="flex justify-between text-xl font-black text-gray-900 pt-2 border-t border-gray-200">
-                            <span>Total</span>
-                            <span>₹{grandTotal}</span>
-                        </div>
+                    <div className="flex gap-2 mt-2">
+                        <button onClick={() => onCallCustomer(order.token)} className="flex-1 py-1 bg-blue-500/10 text-blue-500 rounded text-xs font-bold">Call</button>
+                        <button onClick={() => onMarkReady(order.id)} className="flex-1 py-1 bg-green-500/10 text-green-500 rounded text-xs font-bold">Done</button>
                     </div>
-                    
-                    <button 
-                        onClick={onCheckout}
-                        disabled={cart.length === 0}
-                        className="w-full py-4 bg-black text-white rounded-xl font-bold shadow-lg hover:bg-gray-800 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                        Checkout ₹{grandTotal}
-                    </button>
                 </div>
+              ))}
             </div>
-        </div>
-    );
-};
+          </div>
+        </>
+      )}
 
-export default POSView;
+      {/* CENTER (Menu) */}
+      <div className="flex-1 flex flex-col h-full overflow-hidden relative">
+        {/* HEADER */}
+        <header className={`h-16 border-b flex items-center justify-between px-4 ${isDarkMode ? 'bg-slate-800/50 border-slate-700' : 'bg-white border-slate-200'}`}>
+          <div className="flex items-center gap-4">
+             <button onClick={() => setShowLeftSidebar(true)} className={`p-2 rounded-lg relative ${isDarkMode ? 'hover:bg-slate-700' : 'hover:bg-slate-100'}`}>
+                <ChefHat size={20}/>
+                {orders.length > 0 && <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>}
+             </button>
+             <h1 className="font-black text-xl">POS</h1>
+          </div>
+          
+          <div className="flex-1 max-w-md mx-4 relative">
+             <Search className={`absolute left-3 top-1/2 -translate-y-1/2 ${textSub}`} size={16} />
+             <input placeholder="Search..." className={`w-full pl-10 pr-4 py-2 rounded-full text-sm outline-none ${inputBg}`} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+          </div>
+
+          <div className="flex items-center gap-2">
+             <button onClick={onToggleTheme} className={`p-2 rounded-full ${isDarkMode ? 'bg-slate-700 text-yellow-400' : 'bg-slate-200 text-slate-600'}`}><Monitor size={18}/></button>
+             {/* 🔴 LOGOUT BUTTON IS HERE 🔴 */}
+             <button onClick={onLogout} className="flex items-center gap-2 px-3 py-2 bg-red-600 text-white rounded-lg text-sm font-bold hover:bg-red-700 transition-colors">
+                 <LogOut size={16}/> Logout
+             </button>
+          </div>
+        </header>
+
+        {/* CATEGORIES */}
+        <div className={`px-4 py-2 flex gap-2 overflow-x-auto border-b ${isDarkMode ? 'border-slate-800' : 'border-slate-100'}`}>
+           {categories.map(cat => (
+             <button key={cat} onClick={() => setSelectedCategory(cat)} className={`px-4 py-1.5 rounded-full text-sm font-bold whitespace-nowrap transition-all ${selectedCategory === cat ? 'bg-blue-600 text-white' : `hover:bg-slate-100 dark:hover:bg-slate-800 ${textSub}`}`}>{cat}</button>
+           ))}
+        </div>
+
+        {/* PRODUCT GRID */}
+        <div className="flex-1 overflow-y-auto p-4">
+           {filteredProducts.length === 0 ? (
+               <div className="flex flex-col items-center justify-center h-full opacity-50">
+                  <Search size={48} className="mb-2"/>
+                  <h3 className="font-bold">No Products Found</h3>
+               </div>
+           ) : (
+               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 pb-20">
+                  {filteredProducts.map(item => {
+                    const inCart = cart.find(c => c.id === item.id);
+                    return (
+                      <div key={item.id} onClick={() => onAddToCart(item)} className={`p-4 rounded-xl border cursor-pointer transition-all hover:scale-[1.02] active:scale-95 ${bgCard} ${inCart ? 'ring-2 ring-blue-500 border-transparent' : 'hover:border-blue-500/50'}`}>
+                         <h3 className="font-bold text-sm truncate mb-1">{item.name}</h3>
+                         <div className="flex justify-between items-center">
+                            <span className="font-black text-blue-500">₹{item.price}</span>
+                            {inCart && <span className="bg-blue-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">{inCart.quantity}</span>}
+                         </div>
+                      </div>
+                    );
+                  })}
+               </div>
+           )}
+        </div>
+      </div>
+
+      {/* RIGHT SIDEBAR (Cart) */}
+      <div className={`w-80 flex flex-col border-l z-20 ${bgCard}`}>
+         <div className="p-4 border-b flex justify-between items-center border-slate-200/10">
+            <h2 className="font-black text-lg">Cart</h2>
+            <div className="flex items-center gap-2">
+                <span className="text-xs font-bold opacity-60">Token</span>
+                <select value={selectedToken} onChange={(e) => onSetToken(e.target.value)} className={`text-sm font-bold border rounded p-1 ${inputBg}`}>
+                    {availableTokens.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+            </div>
+         </div>
+
+         <div className="flex-1 overflow-y-auto p-3 space-y-2">
+             {cart.map(item => (
+                 <div key={item.id} className={`p-3 rounded-lg border flex justify-between items-center ${isDarkMode ? 'bg-slate-700/30 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
+                     <div><p className="font-bold text-sm">{item.name}</p><p className="text-xs text-blue-500 font-bold">₹{item.price * item.quantity}</p></div>
+                     <div className="flex items-center gap-2">
+                         <button onClick={() => onRemoveFromCart(item)} className="px-2 bg-slate-500/10 rounded">-</button>
+                         <span className="text-xs font-black">{item.quantity}</span>
+                         <button onClick={() => onAddToCart(item)} className="px-2 bg-slate-500/10 rounded">+</button>
+                     </div>
+                 </div>
+             ))}
+         </div>
+
+         <div className={`p-4 border-t ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
+             <div className="space-y-1 mb-4 text-xs font-medium opacity-70">
+                 <div className="flex justify-between"><span>Subtotal</span><span>{cartSubtotal}</span></div>
+                 <div className="flex justify-between items-center"><span>Discount</span><input className={`w-12 text-right border rounded p-0.5 ${inputBg}`} type="number" value={discount} onChange={e => setDiscount(e.target.value)} /></div>
+                 <div className="flex justify-between"><span>GST ({taxRate}%)</span><span>{Math.round(taxAmount)}</span></div>
+             </div>
+             <div className="flex justify-between font-black text-xl mb-4"><span>Total</span><span>₹{grandTotal}</span></div>
+             <button onClick={onCheckout} disabled={cart.length === 0} className={`w-full py-3 rounded-lg font-black text-lg transition-all ${cart.length > 0 ? 'bg-blue-600 text-white hover:bg-blue-500' : 'bg-slate-700 text-slate-500 cursor-not-allowed'}`}>
+                Checkout ₹{grandTotal}
+             </button>
+         </div>
+      </div>
+    </div>
+  );
+}
