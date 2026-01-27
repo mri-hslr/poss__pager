@@ -6,9 +6,9 @@ const SECRET_KEY = process.env.JWT_SECRET || 'supersecretkey';
 
 // 1. SIGNUP (Create User)
 exports.signup = (req, res) => {
-    const { email, password, role } = req.body;
+    const { username,email, password, role } = req.body;
 
-    if (!email || !password) {
+    if (!username|| !email || !password) {
         return res.status(400).json({ message: "Email and password are required" });
     }
 
@@ -29,8 +29,8 @@ exports.signup = (req, res) => {
             const userRole = role || 'cashier';
 
             // Insert new user
-            const insertQuery = 'INSERT INTO users (email, password, role) VALUES (?, ?, ?)';
-            db.query(insertQuery, [email, hashedPassword, userRole], (err, result) => {
+            const insertQuery = 'INSERT INTO users (username,email, password, role) VALUES (?,?, ?, ?)';
+            db.query(insertQuery, [username,email, hashedPassword, userRole], (err, result) => {
                 if (err) {
                     console.error("Insert User Error:", err);
                     return res.status(500).json({ message: "Error registering user" });
@@ -78,6 +78,7 @@ exports.login = (req, res) => {
             token, 
             user: { 
                 id: user.id, 
+                username: user.username,
                 email: user.email, 
                 role: user.role 
             } 
@@ -88,7 +89,7 @@ exports.login = (req, res) => {
 // 3. GET ALL USERS (Fixed)
 exports.getAllUsers = (req, res) => {
     // This query caused your crash because 'id' was missing. Step 1 fixes this.
-    const query = "SELECT id, email, role FROM users";
+    const query = "SELECT id, username,email, role FROM users";
     
     db.query(query, (err, results) => {
         if (err) {
