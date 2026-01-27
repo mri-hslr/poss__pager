@@ -1,12 +1,14 @@
 const db = require('../db');
 
-function createOrder(totalAmount, paymentMethod) {
+// ✅ Updated to accept 'token'
+function createOrder(totalAmount, paymentMethod, token) {
   return new Promise((resolve, reject) => {
+    // Make sure your database has a 'token' column!
     const query = `
-      INSERT INTO orders (total_amount, payment_method)
-      VALUES (?, ?)
+      INSERT INTO orders (total_amount, payment_method, token)
+      VALUES (?, ?, ?)
     `;
-    db.query(query, [totalAmount, paymentMethod], (err, result) => {
+    db.query(query, [totalAmount, paymentMethod, token], (err, result) => {
       if (err) reject(err);
       else resolve(result.insertId);
     });

@@ -1,25 +1,34 @@
 const express = require('express');
+const cors = require('cors');
 const app = express();
 
-const productRoutes = require('./routes/products');
-const authRoutes = require('./routes/authRoutes');
-const orderRoutes = require('./routes/orderRoutes');
-const settingsRoutes = require("./routes/settingsRoutes");
-const authMiddleware = require('./middleware/authMiddleware');
-const cors = require('cors');
+// --- Configuration ---
+const PORT = 3000;
 
+// --- Middleware ---
 app.use(cors());
 app.use(express.json());
 
-app.get('/', (req, res) => {
-  res.send('Point of Sale Backend is running');
-});
+// --- Import Routes ---
+const authRoutes = require('./routes/authRoutes');
+const orderRoutes = require('./routes/orderRoutes');
+const productRoutes = require('./routes/products');
+const settingsRoutes = require('./routes/settingsRoutes');
 
-app.use('/auth', authRoutes);
+// --- Import Route Guards ---
+const authMiddleware = require('./middleware/authMiddleware');
+
+// --- Register Routes ---
+app.use('/auth', authRoutes); // Public (Login/Signup)
+
+// Protected Routes (Require Login)
+app.use('/orders', authMiddleware, orderRoutes);
 app.use('/products', authMiddleware, productRoutes);
-app.use('/orders', authMiddleware, orderRoutes);  // IMPORTANT
-app.use("/settings", authMiddleware, settingsRoutes);
-const PORT = 3000;
+app.use('/settings', authMiddleware, settingsRoutes);
+
+// --- Start Server ---
 app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+  console.log(`\n🚀 POS Server Online`);
+  console.log(`📡 URL: http://localhost:${PORT}`);
+  console.log(`-----------------------------------`);
 });

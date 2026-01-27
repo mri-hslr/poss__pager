@@ -1,63 +1,51 @@
-const productModel = require("../models/productModel");
+// ✅ MAKE SURE THIS PATH IS CORRECT (points to db.js in the main folder)
+const db = require('../db'); 
 
-// CREATE
-async function addProduct(req, res) {
-  const { name, price, stock, category } = req.body;
+exports.getAllProducts = (req, res) => {
+    // 🔍 Query the database
+    const query = "SELECT * FROM products";
+    
+    db.query(query, (err, results) => {
+        if (err) {
+            console.error("❌ DB Error in getAllProducts:", err.message);
+            return res.status(500).json({ message: "Database error" });
+        }
 
-  if (!name || price == null || stock == null) {
-    return res.status(400).json({ message: "invalid input" });
-  }
+        // 📢 LOGGING: This will show in your terminal!
+        console.log(`✅ Database found ${results.length} products`);
 
-  try {
-    const result = await productModel.addProduct(name, price, stock, category);
-    res.status(201).json({ message: "product added", productId: result.insertId });
-  } catch (err) {
-    res.status(500).json({ message: "server error" });
-  }
-}
+        if (results.length === 0) {
+            console.log("⚠️ WARNING: The 'products' table is empty!");
+        }
 
-// READ
-async function getAllProducts(req, res) {
-  try {
-    const products = await productModel.getAllProducts();
-    res.status(200).json({ products });
-  } catch (err) {
-    res.status(500).json({ message: "server error" });
-  }
-}
+        res.json(results);
+    });
+};
 
-// UPDATE
-async function updateProduct(req, res) {
-  const id = req.params.id;
-  const { name, price, stock, category } = req.body;
+// Admin: Add Product
+exports.createProduct = (req, res) => {
+    const { name, category, price } = req.body;
+    const query = "INSERT INTO products (name, category, price) VALUES (?, ?, ?)";
+    db.query(query, [name, category, price], (err, result) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ message: "Product added", id: result.insertId });
+    });
+};
 
-  if (!name || price == null || stock == null) {
-    return res.status(400).json({ message: "invalid input" });
-  }
+// Admin: Delete Product
+exports.deleteProduct = (req, res) => {
+    db.query("DELETE FROM products WHERE id = ?", [req.params.id], (err) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ message: "Deleted" });
+    });
+};
 
-  try {
-    await productModel.updateProduct(id, name, price, stock, category);
-    res.json({ message: "product updated" });
-  } catch (err) {
-    res.status(500).json({ message: "server error" });
-  }
-}
-
-// DELETE
-async function deleteProduct(req, res) {
-  const id = req.params.id;
-
-  try {
-    await productModel.deleteProduct(id);
-    res.json({ message: "product deleted" });
-  } catch (err) {
-    res.status(500).json({ message: "server error" });
-  }
-}
-
-module.exports = {
-  addProduct,
-  getAllProducts,
-  updateProduct,
-  deleteProduct,
+// Admin: Update Product
+exports.updateProduct = (req, res) => {
+    const { name, category, price } = req.body;
+    const query = "UPDATE products SET name=?, category=?, price=? WHERE id=?";
+    db.query(query, [name, category, price, req.params.id], (err) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ message: "Updated" });
+    });
 };

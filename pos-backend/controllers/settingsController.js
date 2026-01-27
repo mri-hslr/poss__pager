@@ -1,27 +1,37 @@
-const settingsModel = require("../models/settingsModel");
+// ✅ FIXED PATH: Pointing to '../db' instead of '../services/db'
+const db = require('../db'); 
 
+// Get Settings
 async function getSettings(req, res) {
-  try {
-    const settings = await settingsModel.getSettings();
-    res.json(settings);
-  } catch {
-    res.status(500).json({ message: "Failed to load settings" });
-  }
+    const query = 'SELECT upi_id, payee_name FROM store_settings WHERE id = 1';
+    
+    db.query(query, (err, results) => {
+        if (err) {
+            console.error("Settings DB Error:", err);
+            // Return defaults if DB fails so frontend doesn't crash
+            return res.json({ upi_id: 'aakash@okaxis', payee_name: 'Aakash' });
+        }
+        res.json(results[0] || { upi_id: '', payee_name: '' });
+    });
 }
 
+// Update Settings
 async function updateSettings(req, res) {
-  const { upiId, payeeName } = req.body;
+    const { upi_id, payee_name } = req.body;
 
-  if (!upiId || !payeeName) {
-    return res.status(400).json({ message: "Missing fields" });
-  }
+    if (!upi_id || !payee_name) {
+        return res.status(400).json({ message: "UPI ID and Payee Name are required" });
+    }
 
-  try {
-    await settingsModel.updateSettings(upiId, payeeName);
-    res.json({ message: "Settings updated" });
-  } catch {
-    res.status(500).json({ message: "Failed to update settings" });
-  }
+    const query = 'UPDATE store_settings SET upi_id = ?, payee_name = ? WHERE id = 1';
+
+    db.query(query, [upi_id, payee_name], (err, result) => {
+        if (err) {
+            console.error("Update Error:", err);
+            return res.status(500).json({ message: "Failed to update settings" });
+        }
+        res.json({ message: "Settings updated successfully", upi_id, payee_name });
+    });
 }
 
 module.exports = { getSettings, updateSettings };
