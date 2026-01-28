@@ -3,8 +3,7 @@ const cors = require('cors');
 const app = express();
 
 // --- Configuration ---
-const PORT = 3000;
-
+const PORT = process.env.PORT || 3000;
 // --- Middleware ---
 app.use(cors());
 app.use(express.json());
@@ -28,7 +27,5 @@ app.use('/settings', authMiddleware, settingsRoutes);
 
 // --- Start Server ---
 app.listen(PORT, () => {
-  console.log(`\n🚀 POS Server Online`);
-  console.log(`📡 URL: http://localhost:${PORT}`);
-  console.log(`-----------------------------------`);
+  console.log(`Server running on port ${PORT}`);
 });
