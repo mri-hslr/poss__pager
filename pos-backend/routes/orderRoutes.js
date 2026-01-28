@@ -1,22 +1,23 @@
-const express = require("express");
+const express = require('express');
 const router = express.Router();
-const orderController = require("../controllers/orderController");
+const orderController = require('../controllers/orderController');
+const authMiddleware = require('../middleware/authMiddleware');
 
 console.log("✅ Order Routes Loaded");
 
-// 1. GET all active orders (Kitchen View)
-router.get("/", orderController.getActiveOrders); 
+// 1. Create Order
+// Uses: orderController.createOrder
+router.post('/', authMiddleware, orderController.createOrder);
 
-// 2. Create a new order (Checkout)
-router.post("/", orderController.createOrder);
+// 2. Get All Active Orders (Kitchen)
+// Uses: orderController.getActiveOrders
+router.get('/', authMiddleware, orderController.getActiveOrders);
 
-// 3. Call a customer (Bell Button)
-router.post("/call-token", orderController.callToken);
+// 3. Delete/Complete Order
+// Uses: orderController.deleteOrder
+router.delete('/:id', authMiddleware, orderController.deleteOrder);
 
-// 4. Mark SINGLE order as ready
-router.delete("/:id", orderController.deleteOrder);
-
-// ❌ REMOVED: router.post("/:id/assign-token", ...) 
-// We removed this legacy route because the function no longer exists.
+// ❌ REMOVED: router.post('/call-token', ...) 
+// The frontend now handles the USB connection directly, so this route is dead.
 
 module.exports = router;

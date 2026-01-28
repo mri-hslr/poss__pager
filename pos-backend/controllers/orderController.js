@@ -2,7 +2,6 @@ const db = require('../db');
 const orderModel = require('../models/orderModel');
 const settingsModel = require('../models/settingsModel');
 const QRCode = require('qrcode');
-const { sendTokenToESP } = require('../services/espService');
 
 // --- 1. Create Order (Checkout) ---
 async function createOrder(req, res) {
@@ -31,15 +30,12 @@ async function createOrder(req, res) {
     );
     await Promise.all(itemPromises);
 
-    // 3. Trigger ESP32 (Non-blocking)
-    sendTokenToESP(token).catch(e => console.log("UART Silent Fail"));
-
-    // 4. Generate UPI (If needed)
+    // 3. Generate UPI (If needed)
     let upi = null;
     if (method === "upi") {
          try {
-             let upiId = "aakash@okaxis"; 
-             let payee = "Aakash";
+             let upiId = "example@upi"; 
+             let payee = "Merchant";
              const settings = await settingsModel.getSettings();
              if (settings?.upi_id) { 
                  upiId = settings.upi_id; 
@@ -51,6 +47,7 @@ async function createOrder(req, res) {
          } catch(e) { console.error("UPI Gen Error", e); }
     }
 
+    // Success! (Frontend will handle the Dock signal now)
     res.json({ message: "Success", orderId, token, upi });
 
   } catch (err) {
@@ -69,7 +66,10 @@ async function getActiveOrders(req, res) {
     `;
 
     db.query(query, (err, results) => {
-        if (err) return res.status(500).json([]);
+        if (err) {
+            console.error("Fetch Orders Error:", err);
+            return res.status(500).json([]);
+        }
         
         const ordersMap = {};
         results.forEach(row => {
@@ -87,20 +87,26 @@ async function getActiveOrders(req, res) {
     });
 }
 
-// --- 3. Call Customer (Bell Button) ---
-async function callToken(req, res) {
-    const { token } = req.body;
-    console.log(`📢 Manual Call: Token ${token}`);
-    await sendTokenToESP(token);
-    res.json({ success: true });
-}
-
-// --- 4. Mark Ready (Delete) ---
+// --- 3. Delete Order (Mark Ready) ---
 async function deleteOrder(req, res) {
     const orderId = req.params.id;
-    db.query('DELETE FROM order_items WHERE order_id = ?', [orderId], () => {
-        db.query('DELETE FROM orders WHERE id = ?', [orderId], () => res.json({ msg: "Cleared" }));
+    
+    // First delete items, then the order (Foreign Key fix)
+    db.query('DELETE FROM order_items WHERE order_id = ?', [orderId], (err) => {
+        if (err) {
+            console.error("Delete Items Error:", err);
+            return res.status(500).json({ message: "DB Error" });
+        }
+        
+        db.query('DELETE FROM orders WHERE id = ?', [orderId], (err2) => {
+            if (err2) {
+                console.error("Delete Order Error:", err2);
+                return res.status(500).json({ message: "DB Error" });
+            }
+            res.json({ msg: "Order Cleared" });
+        });
     });
 }
 
-module.exports = { createOrder, getActiveOrders, callToken, deleteOrder };
+// ✅ Export all functions so the server can see them
+module.exports = { createOrder, getActiveOrders, deleteOrder };
