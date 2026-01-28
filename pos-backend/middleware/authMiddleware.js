@@ -1,6 +1,6 @@
 const jwt = require("jsonwebtoken");
 
-const JWT_SECRET = "supersecretkey"; // later move to env
+const JWT_SECRET = process.env.JWT_SECRET || "supersecretkey"; // later move to env
 
 function authMiddleware(req, res, next) {
   // 1. Get Authorization header
