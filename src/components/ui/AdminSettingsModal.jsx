@@ -1,58 +1,58 @@
 import React, { useState, useEffect } from 'react';
-import { Save, X, CreditCard, User } from 'lucide-react';
+import { X, Save, RefreshCw } from 'lucide-react';
 
-export default function AdminSettingsModal({ open, onClose }) {
-  const API_URL = import.meta.env.VITE_API_URL;
+// ✅ FIX: Add API_URL to props here
+export default function AdminSettingsModal({ open, onClose, API_URL }) {
+  
+  // ❌ DELETE THIS LINE if it exists:
+  // const API_URL = "http://localhost:3000"; 
+
+  const [settings, setSettings] = useState({
+    upi_id: '',
+    payee_name: '',
+    currency: 'INR'
+  });
+  const [loading, setLoading] = useState(false);
   const token = localStorage.getItem("auth_token");
 
-  const [upiId, setUpiId] = useState('');
-  const [payeeName, setPayeeName] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState(null);
-
-  // Load current settings when modal opens
+  // 1. Load Settings on Open
   useEffect(() => {
     if (open) {
-      setMessage(null);
+      // ✅ Use the passed API_URL
       fetch(`${API_URL}/settings`, {
         headers: { Authorization: `Bearer ${token}` }
       })
       .then(res => res.json())
       .then(data => {
-        if (data.upi_id) {
-          setUpiId(data.upi_id);
-          setPayeeName(data.payee_name);
-        }
+        if (data && !data.message) setSettings(data);
       })
-      .catch(err => console.error("Failed to load settings"));
+      .catch(err => console.error("Failed to load settings", err));
     }
-  }, [open, token]);
+  }, [open, API_URL, token]); // Add API_URL to dependencies
 
+  // 2. Save Settings
   const handleSave = async () => {
     setLoading(true);
-    setMessage(null);
-
     try {
+      // ✅ Use the passed API_URL
       const res = await fetch(`${API_URL}/settings`, {
         method: 'PUT',
         headers: { 
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          Authorization: `Bearer ${token}` 
         },
-        body: JSON.stringify({ upi_id: upiId, payee_name: payeeName })
+        body: JSON.stringify(settings)
       });
 
       if (res.ok) {
-        setMessage({ type: 'success', text: '✅ Settings Updated Successfully!' });
-        setTimeout(() => {
-           onClose(); 
-           window.location.reload(); // Reload to refresh the main UI context
-        }, 1000);
+        alert("Settings Saved!");
+        onClose();
       } else {
-        setMessage({ type: 'error', text: '❌ Update Failed' });
+        alert("Failed to save settings");
       }
     } catch (error) {
-      setMessage({ type: 'error', text: '❌ Network Error' });
+      console.error(error);
+      alert("Error saving settings");
     } finally {
       setLoading(false);
     }
@@ -61,70 +61,52 @@ export default function AdminSettingsModal({ open, onClose }) {
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in duration-200">
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
+      <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 overflow-hidden">
         
         {/* Header */}
-        <div className="bg-slate-900 p-6 flex justify-between items-center">
-          <h2 className="text-white font-bold text-lg flex items-center gap-2">
-            <CreditCard size={20} className="text-blue-400" />
-            Payment Settings
-          </h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-white transition-colors">
-            <X size={24} />
+        <div className="p-4 border-b dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-800/50">
+          <h2 className="font-black text-lg text-slate-700 dark:text-white">System Settings</h2>
+          <button onClick={onClose} className="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full transition-colors">
+            <X size={20} className="text-slate-500" />
           </button>
         </div>
 
         {/* Body */}
-        <div className="p-6 space-y-6">
-          
-          {message && (
-            <div className={`p-3 rounded-lg text-sm font-bold text-center ${message.type === 'success' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
-              {message.text}
-            </div>
-          )}
-
-          <div className="space-y-2">
-            <label className="text-xs font-bold text-slate-500 uppercase">Merchant UPI ID (VPA)</label>
-            <div className="flex items-center border-2 border-slate-200 rounded-xl px-3 py-3 focus-within:border-blue-500 transition-colors">
-              <CreditCard size={18} className="text-slate-400 mr-3" />
-              <input 
-                type="text" 
-                value={upiId}
-                onChange={(e) => setUpiId(e.target.value)}
-                placeholder="e.g. merchant@okaxis"
-                className="w-full outline-none font-medium text-slate-800"
-              />
-            </div>
+        <div className="p-6 space-y-4">
+          <div>
+            <label className="block text-xs font-bold uppercase text-slate-500 mb-1">UPI ID (For QR Code)</label>
+            <input 
+              value={settings.upi_id} 
+              onChange={e => setSettings({...settings, upi_id: e.target.value})} 
+              className="w-full p-3 bg-slate-100 dark:bg-slate-800 border-none rounded-xl font-bold dark:text-white focus:ring-2 focus:ring-blue-500 outline-none" 
+              placeholder="example@upi"
+            />
           </div>
-
-          <div className="space-y-2">
-            <label className="text-xs font-bold text-slate-500 uppercase">Payee Name (Business Name)</label>
-            <div className="flex items-center border-2 border-slate-200 rounded-xl px-3 py-3 focus-within:border-blue-500 transition-colors">
-              <User size={18} className="text-slate-400 mr-3" />
-              <input 
-                type="text" 
-                value={payeeName}
-                onChange={(e) => setPayeeName(e.target.value)}
-                placeholder="e.g. My Restaurant"
-                className="w-full outline-none font-medium text-slate-800"
-              />
-            </div>
+          <div>
+            <label className="block text-xs font-bold uppercase text-slate-500 mb-1">Payee Name</label>
+            <input 
+              value={settings.payee_name} 
+              onChange={e => setSettings({...settings, payee_name: e.target.value})} 
+              className="w-full p-3 bg-slate-100 dark:bg-slate-800 border-none rounded-xl font-bold dark:text-white focus:ring-2 focus:ring-blue-500 outline-none" 
+              placeholder="Merchant Name"
+            />
           </div>
-
-          <div className="bg-blue-50 p-4 rounded-xl text-xs text-blue-700 leading-relaxed">
-            ℹ️ <strong>Note:</strong> Changing these details will instantly update the QR code generated for all future orders.
-          </div>
-
-          <button 
-            onClick={handleSave}
-            disabled={loading}
-            className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 transition-all active:scale-95 shadow-lg shadow-slate-900/20"
-          >
-            {loading ? 'Saving...' : <><Save size={18} /> Update Settings</>}
-          </button>
-
         </div>
+
+        {/* Footer */}
+        <div className="p-4 border-t dark:border-slate-800 flex justify-end gap-3 bg-slate-50 dark:bg-slate-800/50">
+          <button onClick={onClose} className="px-4 py-2 font-bold text-slate-500 hover:text-slate-700">Cancel</button>
+          <button 
+            onClick={handleSave} 
+            disabled={loading}
+            className="px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl flex items-center gap-2 disabled:opacity-50"
+          >
+            {loading ? <RefreshCw className="animate-spin" size={18} /> : <Save size={18} />}
+            Save Changes
+          </button>
+        </div>
+
       </div>
     </div>
   );

@@ -1,4 +1,4 @@
-const { SerialPort } = require("serialport");
+/*const { SerialPort } = require("serialport");
 
 // ⚙️ CONFIGURATION
 // Windows: "COM9" (or whatever yours is) | Mac: "/dev/cu.usbserial-0001"
@@ -42,6 +42,7 @@ try {
  * Sends a token to the ESP32 via UART.
  * Returns immediately so the UI never freezes.
  */
+/*
 function sendTokenToESP(token) {
   return new Promise((resolve) => {
     // If no ESP connected, just pretend we sent it
@@ -63,4 +64,4 @@ function sendTokenToESP(token) {
   });
 }
 
-module.exports = { sendTokenToESP };
+module.exports = { sendTokenToESP };*/

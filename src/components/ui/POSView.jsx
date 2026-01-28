@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, Monitor, LogOut, X, ChefHat, RotateCw } from 'lucide-react';
+import { Search, Monitor, LogOut, X, ChefHat, Bell, Plus, Minus } from 'lucide-react';
 
 export default function POSView({ 
   menu = {}, 
@@ -14,7 +14,7 @@ export default function POSView({
   onAddToCart, 
   onRemoveFromCart, 
   onCheckout, 
-  onLogout, // 👈 LOGOUT FUNCTION IS HERE
+  onLogout, 
   userRole, 
   isDarkMode, 
   onToggleTheme,
@@ -68,7 +68,7 @@ export default function POSView({
                        <div key={idx} className={`text-sm ${textSub}`}>{item.quantity}x {item.name}</div>
                     ))}
                     <div className="flex gap-2 mt-2">
-                        <button onClick={() => onCallCustomer(order.token)} className="flex-1 py-1 bg-blue-500/10 text-blue-500 rounded text-xs font-bold">Call</button>
+                        <button onClick={() => onCallCustomer(order.token)} className="flex-1 py-1 bg-blue-500/10 text-blue-500 rounded text-xs font-bold flex items-center justify-center gap-1"><Bell size={12}/> Call</button>
                         <button onClick={() => onMarkReady(order.id)} className="flex-1 py-1 bg-green-500/10 text-green-500 rounded text-xs font-bold">Done</button>
                     </div>
                 </div>
@@ -97,7 +97,6 @@ export default function POSView({
 
           <div className="flex items-center gap-2">
              <button onClick={onToggleTheme} className={`p-2 rounded-full ${isDarkMode ? 'bg-slate-700 text-yellow-400' : 'bg-slate-200 text-slate-600'}`}><Monitor size={18}/></button>
-             {/* 🔴 LOGOUT BUTTON IS HERE 🔴 */}
              <button onClick={onLogout} className="flex items-center gap-2 px-3 py-2 bg-red-600 text-white rounded-lg text-sm font-bold hover:bg-red-700 transition-colors">
                  <LogOut size={16}/> Logout
              </button>
@@ -106,6 +105,7 @@ export default function POSView({
 
         {/* CATEGORIES */}
         <div className={`px-4 py-2 flex gap-2 overflow-x-auto border-b ${isDarkMode ? 'border-slate-800' : 'border-slate-100'}`}>
+           <button onClick={() => setSelectedCategory("")} className={`px-4 py-1.5 rounded-full text-sm font-bold whitespace-nowrap transition-all ${selectedCategory === "" ? 'bg-blue-600 text-white' : `hover:bg-slate-100 dark:hover:bg-slate-800 ${textSub}`}`}>All Items</button>
            {categories.map(cat => (
              <button key={cat} onClick={() => setSelectedCategory(cat)} className={`px-4 py-1.5 rounded-full text-sm font-bold whitespace-nowrap transition-all ${selectedCategory === cat ? 'bg-blue-600 text-white' : `hover:bg-slate-100 dark:hover:bg-slate-800 ${textSub}`}`}>{cat}</button>
            ))}
@@ -124,11 +124,11 @@ export default function POSView({
                     const inCart = cart.find(c => c.id === item.id);
                     return (
                       <div key={item.id} onClick={() => onAddToCart(item)} className={`p-4 rounded-xl border cursor-pointer transition-all hover:scale-[1.02] active:scale-95 ${bgCard} ${inCart ? 'ring-2 ring-blue-500 border-transparent' : 'hover:border-blue-500/50'}`}>
-                         <h3 className="font-bold text-sm truncate mb-1">{item.name}</h3>
-                         <div className="flex justify-between items-center">
-                            <span className="font-black text-blue-500">₹{item.price}</span>
-                            {inCart && <span className="bg-blue-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">{inCart.quantity}</span>}
-                         </div>
+                          <h3 className="font-bold text-sm truncate mb-1">{item.name}</h3>
+                          <div className="flex justify-between items-center">
+                             <span className="font-black text-blue-500">₹{item.price}</span>
+                             {inCart && <span className="bg-blue-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">{inCart.quantity}</span>}
+                          </div>
                       </div>
                     );
                   })}
@@ -143,9 +143,12 @@ export default function POSView({
             <h2 className="font-black text-lg">Cart</h2>
             <div className="flex items-center gap-2">
                 <span className="text-xs font-bold opacity-60">Token</span>
-                <select value={selectedToken} onChange={(e) => onSetToken(e.target.value)} className={`text-sm font-bold border rounded p-1 ${inputBg}`}>
+                <select value={selectedToken} onChange={(e) => onSetToken(e.target.value)} className={`text-sm font-bold border rounded p-1 w-12 text-center ${inputBg}`}>
                     {availableTokens.map(t => <option key={t} value={t}>{t}</option>)}
+                    <option value={selectedToken}>{selectedToken}</option>
                 </select>
+                
+                {/* ❌ REMOVED BELL BUTTON FROM HERE */}
             </div>
          </div>
 
@@ -154,9 +157,9 @@ export default function POSView({
                  <div key={item.id} className={`p-3 rounded-lg border flex justify-between items-center ${isDarkMode ? 'bg-slate-700/30 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
                      <div><p className="font-bold text-sm">{item.name}</p><p className="text-xs text-blue-500 font-bold">₹{item.price * item.quantity}</p></div>
                      <div className="flex items-center gap-2">
-                         <button onClick={() => onRemoveFromCart(item)} className="px-2 bg-slate-500/10 rounded">-</button>
+                         <button onClick={() => onRemoveFromCart(item)} className="px-2 bg-slate-500/10 rounded"><Minus size={14}/></button>
                          <span className="text-xs font-black">{item.quantity}</span>
-                         <button onClick={() => onAddToCart(item)} className="px-2 bg-slate-500/10 rounded">+</button>
+                         <button onClick={() => onAddToCart(item)} className="px-2 bg-slate-500/10 rounded"><Plus size={14}/></button>
                      </div>
                  </div>
              ))}
@@ -170,7 +173,7 @@ export default function POSView({
              </div>
              <div className="flex justify-between font-black text-xl mb-4"><span>Total</span><span>₹{grandTotal}</span></div>
              <button onClick={onCheckout} disabled={cart.length === 0} className={`w-full py-3 rounded-lg font-black text-lg transition-all ${cart.length > 0 ? 'bg-blue-600 text-white hover:bg-blue-500' : 'bg-slate-700 text-slate-500 cursor-not-allowed'}`}>
-                Checkout ₹{grandTotal}
+                Checkout & Call
              </button>
          </div>
       </div>
