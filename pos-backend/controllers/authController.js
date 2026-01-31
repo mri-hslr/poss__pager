@@ -1,113 +1,128 @@
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
-const db = require('../db'); // ✅ Correct path to database
+const bcrypt = require("bcryptjs");
+const jwt = require("jsonwebtoken");
+const db = require("../db");
 
-const SECRET_KEY = process.env.JWT_SECRET || 'supersecretkey';
+const JWT_SECRET = process.env.JWT_SECRET || "supersecretkey";
 
-// 1. SIGNUP (Create User)
-exports.signup = (req, res) => {
-    const { username,email, password, role } = req.body;
+// ======================= SIGNUP =======================
+exports.signup = async (req, res) => {
+  const { username, email, password, role } = req.body;
 
-    if (!username|| !email || !password) {
-        return res.status(400).json({ message: "Email and password are required" });
+  if (!username || !email || !password) {
+    return res.status(400).json({ message: "Missing fields" });
+  }
+
+  const conn = await db.getConnection();
+
+  try {
+    await conn.beginTransaction();
+
+    // 1️⃣ Check if user exists
+    const [existing] = await conn.query(
+      "SELECT id FROM users WHERE email = ? LIMIT 1",
+      [email]
+    );
+
+    if (existing.length) {
+      await conn.rollback();
+      return res.status(409).json({ message: "User already exists" });
     }
 
-    // Check if user exists
-    const checkQuery = 'SELECT * FROM users WHERE email = ?';
-    db.query(checkQuery, [email], async (err, results) => {
-        if (err) {
-            console.error("Signup DB Error:", err);
-            return res.status(500).json({ message: "Database error" });
-        }
-        if (results.length > 0) {
-            return res.status(400).json({ message: "User already exists" });
-        }
+    // 2️⃣ Create restaurant (only for admin signup)
+    const [restaurantResult] = await conn.query(
+      "INSERT INTO restaurants (name, email) VALUES (?, ?)",
+      [`${username}'s Restaurant`, email]
+    );
 
-        // Hash password
-        try {
-            const hashedPassword = await bcrypt.hash(password, 10);
-            const userRole = role || 'cashier';
+    const restaurantId = restaurantResult.insertId;
 
-            // Insert new user
-            const insertQuery = 'INSERT INTO users (username,email, password, role) VALUES (?,?, ?, ?)';
-            db.query(insertQuery, [username,email, hashedPassword, userRole], (err, result) => {
-                if (err) {
-                    console.error("Insert User Error:", err);
-                    return res.status(500).json({ message: "Error registering user" });
-                }
-                res.status(201).json({ message: "User created successfully" });
-            });
-        } catch (error) {
-            console.error("Hashing Error:", error);
-            res.status(500).json({ message: "Server error" });
-        }
-    });
+    // 3️⃣ Hash password
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // 4️⃣ Create user
+    await conn.query(
+      `INSERT INTO users (restaurant_id, username, email, password, role)
+       VALUES (?, ?, ?, ?, ?)`,
+      [restaurantId, username, email, hashedPassword, role || "admin"]
+    );
+
+    await conn.commit();
+
+    res.status(201).json({ message: "Signup successful" });
+
+  } catch (err) {
+    await conn.rollback();
+    console.error("Signup error:", err);
+    res.status(500).json({ message: "Server error" });
+  } finally {
+    conn.release();
+  }
 };
 
-// 2. LOGIN
-exports.login = (req, res) => {
-    const { email, password } = req.body;
+// ======================= LOGIN =======================
+exports.login = async (req, res) => {
+  const { email, password } = req.body;
 
-    const query = 'SELECT * FROM users WHERE email = ?';
-    db.query(query, [email], async (err, results) => {
-        if (err) {
-            console.error("Login DB Error:", err);
-            return res.status(500).json({ message: "Database error" });
-        }
-        if (results.length === 0) {
-            return res.status(401).json({ message: "User not found" });
-        }
+  const [rows] = await db.query(
+    "SELECT * FROM users WHERE email = ? LIMIT 1",
+    [email]
+  );
 
-        const user = results[0];
+  if (!rows.length) {
+    return res.status(401).json({ message: "Invalid credentials" });
+  }
 
-        // Verify Password
-        const isMatch = await bcrypt.compare(password, user.password);
-        if (!isMatch) {
-            return res.status(401).json({ message: "Invalid credentials" });
-        }
+  const user = rows[0];
+  const match = await bcrypt.compare(password, user.password);
 
-        // Create Token
-        const token = jwt.sign(
-            { userId: user.id, email: user.email, role: user.role }, 
-            SECRET_KEY, 
-            { expiresIn: '24h' }
-        );
+  if (!match) {
+    return res.status(401).json({ message: "Invalid credentials" });
+  }
 
-        // Send back user info (including ID, which is now in your DB)
-        res.json({ 
-            token, 
-            user: { 
-                id: user.id, 
-                username: user.username,
-                email: user.email, 
-                role: user.role 
-            } 
-        });
-    });
+  const token = jwt.sign(
+    {
+      userId: user.id,
+      email: user.email,
+      role: user.role,
+      restaurantId: user.restaurant_id
+    },
+    JWT_SECRET,
+    { expiresIn: "24h" }
+  );
+
+  res.json({
+    token,
+    user: {
+      id: user.id,
+      username: user.username,
+      role: user.role,
+      restaurantId: user.restaurant_id
+    }
+  });
 };
-
-// 3. GET ALL USERS (Fixed)
-exports.getAllUsers = (req, res) => {
-    // This query caused your crash because 'id' was missing. Step 1 fixes this.
-    const query = "SELECT id, username,email, role FROM users";
-    
-    db.query(query, (err, results) => {
-        if (err) {
-            console.error("Fetch Users Error:", err);
-            return res.status(500).json({ message: "Database error fetching users" });
-        }
-        res.json(results);
-    });
-};
-
-// 4. DELETE USER
-exports.deleteUser = (req, res) => {
-    const userId = req.params.id;
-    db.query("DELETE FROM users WHERE id = ?", [userId], (err, result) => {
-        if (err) {
-            console.error("Delete User Error:", err);
-            return res.status(500).json({ message: "Database error" });
-        }
-        res.json({ message: "User deleted successfully" });
-    });
-};
+// ======================= GET ALL USERS =======================
+exports.getAllUsers = async (req, res) => {
+    try {
+      const [rows] = await db.query(
+        "SELECT id, username, email, role FROM users"
+      );
+      res.json(rows);
+    } catch (err) {
+      console.error("Get users error:", err);
+      res.status(500).json({ message: "Server error" });
+    }
+  };
+  
+  // ======================= DELETE USER =======================
+  exports.deleteUser = async (req, res) => {
+    try {
+      await db.query(
+        "DELETE FROM users WHERE id = ?",
+        [req.params.id]
+      );
+      res.json({ message: "User deleted" });
+    } catch (err) {
+      console.error("Delete user error:", err);
+      res.status(500).json({ message: "Server error" });
+    }
+  };

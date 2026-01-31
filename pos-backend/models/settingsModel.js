@@ -1,19 +1,24 @@
-const db = require('../db'); 
+const db = require("../db");
 
-const getSettings = () => {
-    return new Promise((resolve, reject) => {
-        // ✅ CHANGED: 'app_settings' -> 'store_settings'
-        const query = 'SELECT upi_id, payee_name FROM store_settings WHERE id = 1 LIMIT 1';
-        
-        db.query(query, (err, results) => {
-            if (err) {
-                console.error("Settings DB Error:", err);
-                resolve(null); 
-            } else {
-                resolve(results[0] || null);
-            }
-        });
-    });
-};
+async function getSettings(restaurantId) {
+  const [rows] = await db.query(
+    `SELECT upi_id, payee_name
+     FROM store_settings
+     WHERE restaurant_id = ?`,
+    [restaurantId]
+  );
+  return rows[0];
+}
 
-module.exports = { getSettings };
+async function upsertSettings({ restaurantId, upiId, payeeName }) {
+  await db.query(
+    `INSERT INTO store_settings (restaurant_id, upi_id, payee_name)
+     VALUES (?, ?, ?)
+     ON DUPLICATE KEY UPDATE
+       upi_id = VALUES(upi_id),
+       payee_name = VALUES(payee_name)`,
+    [restaurantId, upiId, payeeName]
+  );
+}
+
+module.exports = { getSettings, upsertSettings };

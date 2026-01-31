@@ -1,41 +1,46 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
-const db = require('../db');
+const db = require("../db");
 
-// GET all products
-router.get('/', (req, res) => {
-    db.query("SELECT * FROM products", (err, results) => {
-        if (err) return res.status(500).json({ message: "DB Error" });
-        res.json(results);
-    });
+router.get("/", async (req, res) => {
+  const [rows] = await db.query(
+    "SELECT * FROM products WHERE restaurant_id = ?",
+    [req.user.restaurantId]
+  );
+  res.json(rows);
 });
 
-// ✅ ADD Product
-router.post('/', (req, res) => {
-    const { name, price, category } = req.body;
-    const query = "INSERT INTO products (name, price, category) VALUES (?, ?, ?)";
-    db.query(query, [name, price, category], (err, result) => {
-        if (err) return res.status(500).json({ message: "Failed to add product" });
-        res.json({ id: result.insertId, message: "Product added" });
-    });
+router.post("/", async (req, res) => {
+  const { name, price, category } = req.body;
+
+  const [result] = await db.query(
+    `INSERT INTO products (restaurant_id, name, price, category)
+     VALUES (?, ?, ?, ?)`,
+    [req.user.restaurantId, name, price, category]
+  );
+
+  res.json({ id: result.insertId });
 });
 
-// ✅ UPDATE Product
-router.put('/:id', (req, res) => {
-    const { name, price, category } = req.body;
-    const query = "UPDATE products SET name=?, price=?, category=? WHERE id=?";
-    db.query(query, [name, price, category, req.params.id], (err) => {
-        if (err) return res.status(500).json({ message: "Failed to update" });
-        res.json({ message: "Product updated" });
-    });
+router.put("/:id", async (req, res) => {
+  const { name, price, category } = req.body;
+
+  await db.query(
+    `UPDATE products
+     SET name=?, price=?, category=?
+     WHERE id=? AND restaurant_id=?`,
+    [name, price, category, req.params.id, req.user.restaurantId]
+  );
+
+  res.json({ message: "Updated" });
 });
 
-// ✅ DELETE Product
-router.delete('/:id', (req, res) => {
-    db.query("DELETE FROM products WHERE id=?", [req.params.id], (err) => {
-        if (err) return res.status(500).json({ message: "Failed to delete" });
-        res.json({ message: "Product deleted" });
-    });
+router.delete("/:id", async (req, res) => {
+  await db.query(
+    "DELETE FROM products WHERE id=? AND restaurant_id=?",
+    [req.params.id, req.user.restaurantId]
+  );
+  res.json({ message: "Deleted" });
 });
 
 module.exports = router;

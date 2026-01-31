@@ -1,30 +1,24 @@
-const db=require('../db');
-// add a new user
-function createUser(name,email,password,role){
-    return new Promise((resolve,reject)=>{
-        const query='INSERT INTO users (username,email,password,role) VALUES (?,?,?,?)';
-        db.query(query,[name,email,password,role],(err,result)=>{
-            if(err){
-                return reject(err);
-            }
-            else {
-                resolve(result)
-            }
-        })
-    })
+const db = require("../db");
+
+async function createUser({ restaurantId, username, email, password, role }) {
+  const [result] = await db.query(
+    `INSERT INTO users (restaurant_id, username, email, password, role)
+     VALUES (?, ?, ?, ?, ?)`,
+    [restaurantId, username, email, password, role]
+  );
+
+  return result.insertId;
 }
-// get user by username
-function findUserByEmail(email){
-    return new Promise((resolve, reject)=>{
-        const query='SELECT *FROM users WHERE email=?';
-        db.query(query,[email],(err,result)=>{
-            if(err){
-                return reject(err);
-            }
-            else {
-                 resolve(result[0])
-            }
-        })
-    })
+
+async function findUserByEmail(email) {
+  const [rows] = await db.query(
+    `SELECT * FROM users WHERE email = ? LIMIT 1`,
+    [email]
+  );
+  return rows[0];
 }
-module.exports={createUser,findUserByEmail}
+
+module.exports = {
+  createUser,
+  findUserByEmail
+};

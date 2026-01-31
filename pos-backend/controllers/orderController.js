@@ -1,112 +1,89 @@
-const db = require('../db');
-const orderModel = require('../models/orderModel');
-const settingsModel = require('../models/settingsModel');
-const QRCode = require('qrcode');
+const orderModel = require("../models/orderModel");
+const storeSettingsModel = require("../models/settingsModel");
+const db = require("../db");
+const QRCode = require("qrcode");
 
-// --- 1. Create Order (Checkout) ---
-async function createOrder(req, res) {
-  const { items, paymentMethod, financials, token } = req.body;
+// ---------------- CREATE ORDER ----------------
+exports.createOrder = async (req, res) => {
+  const { items, paymentMethod } = req.body;
+  const restaurantId = req.user.restaurantId;
 
-  if (!items?.length || !token) {
-      return res.status(400).json({ message: "Invalid order data" });
+  if (!items || !items.length) {
+    return res.status(400).json({ message: "No items" });
   }
 
-  const method = String(paymentMethod || 'cash').toLowerCase();
+  const total = items.reduce(
+    (sum, i) => sum + i.price * i.quantity,
+    0
+  );
 
-  try {
-    const total = financials ? Number(financials.finalPayable) : 0;
-    
-    // 1. Save to DB
-    const orderId = await orderModel.createOrder(total, method, token);
-    
-    // 2. Save Items
-    const itemPromises = items.map(item => 
-        orderModel.addOrderItem(orderId, {
-            productId: item.productId ?? item.id,
-            name: item.name,
-            price: item.price,
-            quantity: item.quantity
-        })
-    );
-    await Promise.all(itemPromises);
+  const orderId = await orderModel.createOrder({
+    restaurantId,
+    total,
+    paymentMethod
+  });
 
-    // 3. Generate UPI (If needed)
-    let upi = null;
-    if (method === "upi") {
-         try {
-             let upiId = "example@upi"; 
-             let payee = "Merchant";
-             const settings = await settingsModel.getSettings();
-             if (settings?.upi_id) { 
-                 upiId = settings.upi_id; 
-                 payee = settings.payee_name; 
-             }
-             const upiLink = `upi://pay?pa=${upiId}&pn=${encodeURIComponent(payee)}&am=${total}&cu=INR&tn=Order%20${orderId}`;
-             const qrBase64 = await QRCode.toDataURL(upiLink);
-             upi = { qr: qrBase64, payee: payee };
-         } catch(e) { console.error("UPI Gen Error", e); }
+  for (const item of items) {
+    await orderModel.addOrderItem({
+      orderId,
+      productId: item.productId,
+      price: item.price,
+      quantity: item.quantity
+    });
+  }
+
+  let upi = null;
+
+  if (paymentMethod === "upi") {
+    const settings = await storeSettingsModel.getSettings(restaurantId);
+
+    if (!settings) {
+      return res.status(500).json({ message: "UPI not configured" });
     }
 
-    // Success! (Frontend will handle the Dock signal now)
-    res.json({ message: "Success", orderId, token, upi });
+    const upiLink = `upi://pay?pa=${settings.upi_id}&pn=${encodeURIComponent(
+      settings.payee_name
+    )}&am=${total}&cu=INR&tr=ORD${orderId}`;
 
-  } catch (err) {
-    console.error("❌ Order Error:", err);
-    res.status(500).json({ message: "Server error" });
+    upi = {
+      link: upiLink,
+      qr: await QRCode.toDataURL(upiLink)
+    };
   }
-}
 
-// --- 2. Get Active Orders (Kitchen View) ---
-async function getActiveOrders(req, res) {
-    const query = `
-        SELECT o.id, o.token, o.created_at, oi.product_name, oi.quantity 
-        FROM orders o
-        JOIN order_items oi ON o.id = oi.order_id
-        ORDER BY o.created_at ASC
-    `;
+  res.json({ orderId, total, upi });
+};
 
-    db.query(query, (err, results) => {
-        if (err) {
-            console.error("Fetch Orders Error:", err);
-            return res.status(500).json([]);
-        }
-        
-        const ordersMap = {};
-        results.forEach(row => {
-            if (!ordersMap[row.id]) {
-                ordersMap[row.id] = {
-                    id: row.id,
-                    token: row.token,
-                    startedAt: row.created_at,
-                    items: []
-                };
-            }
-            ordersMap[row.id].items.push({ name: row.product_name, quantity: row.quantity });
-        });
-        res.json(Object.values(ordersMap));
-    });
-}
+// ---------------- GET ACTIVE ORDERS (KITCHEN) ----------------
+exports.getActiveOrders = async (req, res) => {
+  const restaurantId = req.user.restaurantId;
 
-// --- 3. Delete Order (Mark Ready) ---
-async function deleteOrder(req, res) {
-    const orderId = req.params.id;
-    
-    // First delete items, then the order (Foreign Key fix)
-    db.query('DELETE FROM order_items WHERE order_id = ?', [orderId], (err) => {
-        if (err) {
-            console.error("Delete Items Error:", err);
-            return res.status(500).json({ message: "DB Error" });
-        }
-        
-        db.query('DELETE FROM orders WHERE id = ?', [orderId], (err2) => {
-            if (err2) {
-                console.error("Delete Order Error:", err2);
-                return res.status(500).json({ message: "DB Error" });
-            }
-            res.json({ msg: "Order Cleared" });
-        });
-    });
-}
+  const [orders] = await db.query(
+    `
+    SELECT o.id, o.total, o.status, o.created_at
+    FROM orders o
+    WHERE o.restaurant_id = ?
+      AND o.status = 'PENDING'
+    ORDER BY o.created_at ASC
+    `,
+    [restaurantId]
+  );
 
-// ✅ Export all functions so the server can see them
-module.exports = { createOrder, getActiveOrders, deleteOrder };
+  res.json(orders);
+};
+
+// ---------------- DELETE / COMPLETE ORDER ----------------
+exports.deleteOrder = async (req, res) => {
+  const restaurantId = req.user.restaurantId;
+  const orderId = req.params.id;
+
+  await db.query(
+    `
+    DELETE FROM orders
+    WHERE id = ? AND restaurant_id = ?
+    `,
+    [orderId, restaurantId]
+  );
+
+  res.json({ message: "Order completed" });
+};
