@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Save, CreditCard } from 'lucide-react';
+import { X, Save, CreditCard, User } from 'lucide-react'; // ✅ Added User to imports
 
 export default function AdminSettingsModal({ open, onClose, API_URL }) {
   const [upiId, setUpiId] = useState("");
@@ -12,13 +12,19 @@ export default function AdminSettingsModal({ open, onClose, API_URL }) {
       const fetchSettings = async () => {
         try {
           const token = localStorage.getItem("auth_token");
+          // ✅ FIX: Ensure we don't fetch if no API_URL
+          if (!API_URL) return; 
+
           const res = await fetch(`${API_URL}/settings`, {
             headers: { Authorization: `Bearer ${token}` }
           });
+          
           if (res.ok) {
             const data = await res.json();
             setUpiId(data.upi_id || "");
             setPayeeName(data.payee_name || "");
+          } else {
+             console.error("Failed to fetch settings:", res.status);
           }
         } catch (e) {
           console.error("Failed to load settings", e);
@@ -32,7 +38,7 @@ export default function AdminSettingsModal({ open, onClose, API_URL }) {
     setLoading(true);
     try {
       const token = localStorage.getItem("auth_token");
-      await fetch(`${API_URL}/settings`, {
+      const res = await fetch(`${API_URL}/settings`, {
         method: "POST",
         headers: { 
             "Content-Type": "application/json",
@@ -40,10 +46,20 @@ export default function AdminSettingsModal({ open, onClose, API_URL }) {
         },
         body: JSON.stringify({ upi_id: upiId, payee_name: payeeName })
       });
-      alert("Settings Saved!");
+
+      const data = await res.json();
+
+      // ✅ FIX: Check if the server actually saved it
+      if (!res.ok) {
+        throw new Error(data.message || "Server rejected the request");
+      }
+
+      alert("Settings Saved Successfully!");
       onClose();
     } catch (e) {
-      alert("Failed to save");
+      console.error("Save Error:", e);
+      // ✅ FIX: Show the ACTUAL error message
+      alert(`Failed to save: ${e.message}`);
     } finally {
       setLoading(false);
     }
@@ -84,7 +100,8 @@ export default function AdminSettingsModal({ open, onClose, API_URL }) {
             <div>
                 <label className="block text-xs font-bold uppercase text-slate-500 mb-1">Payee Name</label>
                 <div className="relative">
-                    <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18}/>
+                    {/* ✅ FIX: Using imported User icon instead of custom function */}
+                    <User className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18}/>
                     <input 
                         value={payeeName}
                         onChange={(e) => setPayeeName(e.target.value)}
@@ -113,14 +130,4 @@ export default function AdminSettingsModal({ open, onClose, API_URL }) {
       </div>
     </div>
   );
-}
-
-// Simple Icon Component for User (to avoid extra imports if not needed, or just import User from lucide-react)
-function UserIcon({ size, className }) {
-    return (
-        <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-            <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"></path>
-            <circle cx="12" cy="7" r="4"></circle>
-        </svg>
-    );
 }

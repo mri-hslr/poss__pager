@@ -1,38 +1,66 @@
-// ✅ MAKE SURE THIS PATH IS CORRECT (points to db.js in the main folder)
 const db = require('../db'); 
 
+// 1. Get All Products
 exports.getAllProducts = (req, res) => {
-    // 🔍 Query the database
-    const query = "SELECT * FROM products";
-    
-    db.query(query, (err, results) => {
-        if (err) {
-            console.error("❌ DB Error in getAllProducts:", err.message);
-            return res.status(500).json({ message: "Database error" });
+    try {
+        const restaurantId = req.query.restaurantId;
+
+        let query = "SELECT * FROM products";
+        let params = [];
+
+        // ✅ CRASH FIX: Ensure we never pass 'undefined' to SQL
+        if (restaurantId && restaurantId !== 'undefined' && restaurantId !== 'null') {
+            query += " WHERE restaurant_id = ?";
+            params.push(restaurantId);
         }
+        
+        query += " ORDER BY created_at DESC";
 
-        // 📢 LOGGING: This will show in your terminal!
-        console.log(`✅ Database found ${results.length} products`);
-
-        if (results.length === 0) {
-            console.log("⚠️ WARNING: The 'products' table is empty!");
-        }
-
-        res.json(results);
-    });
+        db.query(query, params, (err, results) => {
+            if (err) {
+                console.error("❌ DB Error in getAllProducts:", err.message);
+                return res.json([]); // Return empty list instead of crashing
+            }
+            res.json(results);
+        });
+    } catch (err) {
+        console.error("🔥 Critical Crash in getAllProducts:", err.message);
+        res.status(500).json({ message: "Server Logic Error" });
+    }
 };
 
-// Admin: Add Product
+// 2. Add Product (With Stock)
 exports.createProduct = (req, res) => {
-    const { name, category, price } = req.body;
-    const query = "INSERT INTO products (name, category, price) VALUES (?, ?, ?)";
-    db.query(query, [name, category, price], (err, result) => {
-        if (err) return res.status(500).json({ error: err.message });
-        res.json({ message: "Product added", id: result.insertId });
-    });
+    try {
+        console.log("📝 Incoming Product Data:", req.body);
+
+        const { name, category, price, restaurantId, stock } = req.body;
+
+        // ✅ CRASH FIX: Default values to prevent 'undefined'
+        const safeName = name || "Unnamed Product";
+        const safeCategory = category || "General";
+        const safePrice = price || 0;
+        const safeRestaurantId = restaurantId || 1; // Default to 1 if missing
+        const safeStock = stock || 0;
+
+        const query = "INSERT INTO products (name, category, price, restaurant_id, stock, created_at) VALUES (?, ?, ?, ?, ?, NOW())";
+        
+        // Pass only SAFE variables
+        db.query(query, [safeName, safeCategory, safePrice, safeRestaurantId, safeStock], (err, result) => {
+            if (err) {
+                console.error("❌ DB Error in createProduct:", err.message);
+                return res.status(500).json({ error: err.message });
+            }
+            console.log("✅ Product Created Successfully, ID:", result.insertId);
+            res.json({ message: "Product added", id: result.insertId });
+        });
+    } catch (err) {
+        console.error("🔥 Critical Crash in createProduct:", err.message);
+        res.status(500).json({ message: "Server Logic Error" });
+    }
 };
 
-// Admin: Delete Product
+// 3. Delete Product
 exports.deleteProduct = (req, res) => {
     db.query("DELETE FROM products WHERE id = ?", [req.params.id], (err) => {
         if (err) return res.status(500).json({ error: err.message });
@@ -40,11 +68,11 @@ exports.deleteProduct = (req, res) => {
     });
 };
 
-// Admin: Update Product
+// 4. Update Product
 exports.updateProduct = (req, res) => {
-    const { name, category, price } = req.body;
-    const query = "UPDATE products SET name=?, category=?, price=? WHERE id=?";
-    db.query(query, [name, category, price, req.params.id], (err) => {
+    const { name, category, price, stock } = req.body;
+    const query = "UPDATE products SET name=?, category=?, price=?, stock=? WHERE id=?";
+    db.query(query, [name, category, price, stock, req.params.id], (err) => {
         if (err) return res.status(500).json({ error: err.message });
         res.json({ message: "Updated" });
     });

@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { User, Lock, Loader, Moon, Sun, AtSign } from 'lucide-react';
+import { User, Lock, Loader, Moon, Sun, AtSign, Building2 } from 'lucide-react'; // ✅ Added Building2 icon
 
 export default function LoginView({ onLogin, isDarkMode, onToggleTheme }) {
-  const [isLogin, setIsLogin] = useState(true); // Default to Login mode
+  const [isLogin, setIsLogin] = useState(true); 
   const [formData, setFormData] = useState({
+    restaurantId: '', // ✅ Added Restaurant ID to state
     username: '',
     email: '',
     password: '',
@@ -12,7 +13,6 @@ export default function LoginView({ onLogin, isDarkMode, onToggleTheme }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // Ensure API_URL is defined (fallback for safety)
   const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
   const handleSubmit = async (e) => {
@@ -22,9 +22,9 @@ export default function LoginView({ onLogin, isDarkMode, onToggleTheme }) {
 
     const endpoint = isLogin ? '/auth/login' : '/auth/signup';
 
-    // Prepare data: Login needs only email/pass; Signup needs everything
+    // ✅ Send restaurantId for BOTH Login and Signup
     const payload = isLogin
-      ? { email: formData.email, password: formData.password }
+      ? { email: formData.email, password: formData.password, restaurantId: formData.restaurantId }
       : formData;
 
     try {
@@ -38,13 +38,11 @@ export default function LoginView({ onLogin, isDarkMode, onToggleTheme }) {
       if (!res.ok) throw new Error(data.message || 'Request failed');
 
       if (isLogin) {
-        // Success: Call parent login handler
         onLogin(data.user, data.token);
       } else {
-        // Success: Switch to login view
         alert("Account created! Please log in.");
         setIsLogin(true);
-        setFormData(prev => ({ ...prev, password: '' })); // Clear password for safety
+        setFormData(prev => ({ ...prev, password: '' })); 
       }
 
     } catch (err) {
@@ -54,7 +52,7 @@ export default function LoginView({ onLogin, isDarkMode, onToggleTheme }) {
     }
   };
 
-  // Dynamic Styles
+  // Styles
   const bgClass = isDarkMode ? "bg-slate-900" : "bg-slate-100";
   const cardClass = isDarkMode ? "bg-slate-800 border-slate-700" : "bg-white border-slate-200";
   const textMain = isDarkMode ? "text-white" : "text-slate-800";
@@ -66,7 +64,6 @@ export default function LoginView({ onLogin, isDarkMode, onToggleTheme }) {
   return (
     <div className={`min-h-screen flex items-center justify-center p-4 ${bgClass}`}>
       
-      {/* Theme Toggle Button */}
       <button 
         onClick={onToggleTheme} 
         className={`absolute top-6 right-6 p-3 rounded-full shadow-lg transition-all ${isDarkMode ? 'bg-slate-800 text-yellow-400' : 'bg-white text-slate-600'}`}
@@ -90,15 +87,30 @@ export default function LoginView({ onLogin, isDarkMode, onToggleTheme }) {
 
         <form onSubmit={handleSubmit} className="space-y-4">
 
-          {/* ✅ USERNAME FIELD (Only shows in Signup mode) */}
+          {/* ✅ RESTAURANT ID FIELD (Visible for BOTH Login & Signup) */}
+          <div>
+            <label className={`block text-xs font-bold uppercase mb-1 ${textSub}`}>Restaurant ID</label>
+            <div className="relative group">
+              <Building2 className={`absolute left-3 top-3.5 transition-colors ${isDarkMode ? 'text-slate-400 group-focus-within:text-blue-400' : 'text-slate-400 group-focus-within:text-blue-600'}`} size={20} />
+              <input 
+                type="text" 
+                required
+                className={`w-full pl-10 pr-4 py-3 border-2 rounded-xl outline-none focus:border-blue-500 transition-all font-bold ${inputBg}`}
+                placeholder="e.g. 1"
+                value={formData.restaurantId}
+                onChange={e => setFormData({...formData, restaurantId: e.target.value})}
+              />
+            </div>
+          </div>
+
+          {/* USERNAME (Signup Only) */}
           {!isLogin && (
             <div className="animate-in fade-in slide-in-from-top-2 duration-300">
               <label className={`block text-xs font-bold uppercase mb-1 ${textSub}`}>Username</label>
               <div className="relative group">
                 <User className={`absolute left-3 top-3.5 transition-colors ${isDarkMode ? 'text-slate-400 group-focus-within:text-blue-400' : 'text-slate-400 group-focus-within:text-blue-600'}`} size={20} />
                 <input 
-                  type="text" 
-                  required
+                  type="text" required
                   className={`w-full pl-10 pr-4 py-3 border-2 rounded-xl outline-none focus:border-blue-500 transition-all font-bold ${inputBg}`}
                   placeholder="john_doe"
                   value={formData.username}
@@ -108,7 +120,7 @@ export default function LoginView({ onLogin, isDarkMode, onToggleTheme }) {
             </div>
           )}
 
-          {/* Email Field */}
+          {/* Email */}
           <div>
             <label className={`block text-xs font-bold uppercase mb-1 ${textSub}`}>Email</label>
             <div className="relative group">
@@ -123,7 +135,7 @@ export default function LoginView({ onLogin, isDarkMode, onToggleTheme }) {
             </div>
           </div>
 
-          {/* Password Field */}
+          {/* Password */}
           <div>
             <label className={`block text-xs font-bold uppercase mb-1 ${textSub}`}>Password</label>
             <div className="relative group">
@@ -138,7 +150,7 @@ export default function LoginView({ onLogin, isDarkMode, onToggleTheme }) {
             </div>
           </div>
 
-          {/* ✅ ROLE SELECTION (Only shows in Signup mode) */}
+          {/* ROLE (Signup Only) */}
           {!isLogin && (
             <div className="animate-in fade-in slide-in-from-top-2 duration-300">
               <label className={`block text-xs font-bold uppercase mb-1 ${textSub}`}>Role</label>

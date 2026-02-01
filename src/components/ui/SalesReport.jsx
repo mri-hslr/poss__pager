@@ -22,7 +22,7 @@ export default function SalesReport({ orders = [], history = [], products = [], 
     let discount = Number(o.discount || o.financials?.discount || 0);
     let tax = Number(o.tax || o.financials?.taxAmount || 0);
     
-    // 2. Failsafe
+    // 2. Failsafe for missing amounts
     if (amount === 0 && o.items && Array.isArray(o.items)) {
       const rawSubtotal = o.items.reduce((sum, item) => {
         let price = Number(item.price || 0);
@@ -46,12 +46,17 @@ export default function SalesReport({ orders = [], history = [], products = [], 
     
     if ((method === 'UNKNOWN' || !method) && amount > 0) method = 'CASH';
 
+    // ✅ FIX: Standardize the Date for the Chart
+    // We prefer completedAt (history), then startedAt (active), then created_at (fallback)
+    const activeDate = o.completedAt || o.startedAt || o.created_at || new Date().toISOString();
+
     return { 
         ...o, 
         amount, 
         method, 
         discount, 
         tax, 
+        activeDate, // Store this for sorting/filtering
         status: o.status || "COMPLETED" 
     };
   };
@@ -59,19 +64,20 @@ export default function SalesReport({ orders = [], history = [], products = [], 
   const allOrders = [...orders, ...history];
   
   const filteredOrders = allOrders
+    .map(repairOrderData) // Repair first so we have 'activeDate'
     .filter(o => {
-      if (!o.startedAt) return false;
-      const d = new Date(o.startedAt);
+      // ✅ FIX: Use the standardized 'activeDate'
+      if (!o.activeDate) return false;
+      const d = new Date(o.activeDate);
       return !isNaN(d.getTime()) && d.toLocaleDateString('en-CA') === reportDate;
     })
-    .map(repairOrderData)
-    .sort((a, b) => (b.startedAt || 0) - (a.startedAt || 0));
+    .sort((a, b) => new Date(b.activeDate) - new Date(a.activeDate));
 
   // --- CALCULATIONS ---
   const chartData = useMemo(() => {
     const hours = Array(24).fill(0);
     filteredOrders.forEach(o => { 
-        const h = new Date(o.startedAt).getHours();
+        const h = new Date(o.activeDate).getHours(); // Use activeDate
         hours[h] += o.amount; 
     });
     return hours;
@@ -89,7 +95,7 @@ export default function SalesReport({ orders = [], history = [], products = [], 
     const headers = ["ID", "Time", "Items", "Subtotal", "Discount", "Tax", "Total", "Method"];
     const rows = filteredOrders.map(o => [
         o.id, 
-        new Date(o.startedAt).toLocaleTimeString(), 
+        new Date(o.activeDate).toLocaleTimeString(), 
         `"${o.items?.map(i => `${i.name}(${i.quantity})`).join('|') || ''}"`, 
         (o.amount - o.tax + o.discount).toFixed(2), 
         o.discount,
@@ -107,20 +113,17 @@ export default function SalesReport({ orders = [], history = [], products = [], 
     document.body.removeChild(link);
   };
 
-  // ✅ Force Theme Colors Manually (Solves the White-on-White Hover Bug)
   const theme = {
     bgCard: isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200',
     textMain: isDarkMode ? 'text-white' : 'text-slate-900',
     textSec: isDarkMode ? 'text-slate-400' : 'text-slate-500',
-    // Specifically fix the row colors:
     rowClass: isDarkMode 
-        ? 'border-slate-700 text-slate-300 hover:bg-slate-700/50' // Dark Mode: Dark Row, Light Text
-        : 'border-slate-200 text-slate-700 hover:bg-slate-50',     // Light Mode: Light Row, Dark Text
+        ? 'border-slate-700 text-slate-300 hover:bg-slate-700/50' 
+        : 'border-slate-200 text-slate-700 hover:bg-slate-50',     
   };
 
   return (
     <div className={`flex flex-col h-full font-sans animate-in fade-in zoom-in-95 duration-300`}>
-        
         {/* HEADER */}
         <div className="flex justify-between items-center mb-6 shrink-0">
             <div>
@@ -204,7 +207,7 @@ export default function SalesReport({ orders = [], history = [], products = [], 
                             filteredOrders.map(o => (
                                 <tr key={o.id} className={`border-b transition-colors cursor-default ${theme.rowClass}`}>
                                     <td className="p-3 pl-4 font-mono font-bold opacity-70">#{String(o.id).slice(-4)}</td>
-                                    <td className="p-3 font-bold">{new Date(o.startedAt).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</td>
+                                    <td className="p-3 font-bold">{new Date(o.activeDate).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</td>
                                     <td className="p-3">
                                         <span className={`px-2 py-1 rounded text-xs font-black uppercase 
                                             ${o.method === 'CASH' ? 'bg-green-500/10 text-green-500' : 'bg-blue-500/10 text-blue-500'}`}>
