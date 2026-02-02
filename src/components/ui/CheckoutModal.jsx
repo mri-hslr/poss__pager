@@ -1,127 +1,121 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Banknote, CreditCard, QrCode } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, CheckCircle, Loader } from 'lucide-react';
+import { getTheme, COMMON_STYLES, FONTS } from './theme';
 
-export default function CheckoutModal({
-  isOpen, onClose, onConfirm, onSuccess,
-  cartSubtotal, taxAmount, discount, grandTotal,
-  backendUpiData // <--- Receive the QR data
+export default function CheckoutModal({ 
+  isOpen, onClose, onConfirm, cartSubtotal, taxAmount, discount, grandTotal, orderId, isDarkMode, backendUpiData 
 }) {
+  const [paymentMethod, setPaymentMethod] = useState('cash');
+  const [isProcessing, setIsProcessing] = useState(false);
+  const theme = getTheme(isDarkMode);
+
+  useEffect(() => { 
+    if (isOpen) { 
+      setPaymentMethod('cash'); 
+      setIsProcessing(false); 
+    } 
+  }, [isOpen]);
+  
   if (!isOpen) return null;
 
-  const [paymentMode, setPaymentMode] = useState('CASH');
-  const [cashReceived, setCashReceived] = useState('');
-  const [loading, setLoading] = useState(false);
-  const cashInputRef = useRef(null);
-
-  // Reset when modal opens
-  useEffect(() => {
-    if (isOpen) {
-      setPaymentMode('CASH');
-      setCashReceived('');
-      setLoading(false);
-    }
-  }, [isOpen]);
-
-  const customerPayable = grandTotal;
-
-  // Handle the "Confirm" click
-  const handleConfirm = async () => {
-    setLoading(true);
-    const orderData = {
-      paymentMethod: paymentMode,
-      financials: { finalPayable: customerPayable }
-    };
-    // Call parent finalizeOrder, wait for it to set backendUpiData
-    await onConfirm(orderData);
-    setLoading(false);
+  const handleConfirm = async () => { 
+    setIsProcessing(true); 
+    await onConfirm({ paymentMethod }); 
+    setIsProcessing(false); 
   };
 
-  return (
-    <div className="fixed inset-0 z-[100] flex justify-center items-center bg-black/80 p-4 text-white">
-      <div className="bg-[#0f172a] border border-slate-800 p-8 rounded-3xl w-full max-w-sm shadow-2xl relative">
-        <button 
+  if (backendUpiData) {
+    return (
+      <div className={`fixed inset-0 z-50 flex items-center justify-center ${theme.bg.overlay} p-4`} style={{ fontFamily: FONTS.sans }}>
+        <div className={`w-full max-w-sm rounded-2xl relative p-8 flex flex-col items-center text-center ${COMMON_STYLES.modal(isDarkMode)}`}>
+          <button 
             onClick={onClose} 
-            className="absolute top-4 right-4 text-slate-400 hover:text-white"
-        >
-            ✕
-        </button>
-        
-        <h2 className="text-xl font-bold mb-6 text-center">Payment</h2>
-
-        {/* --- CRITICAL FIX: Direct check for QR Data --- */}
-        {backendUpiData ? (
-          <div className="flex flex-col items-center">
-             <div className="bg-white p-4 rounded-xl mb-4">
-                {/* Render Base64 Image directly */}
-                <img 
-                    src={backendUpiData.qr} 
-                    alt="UPI QR Code" 
-                    className="w-48 h-48" 
-                />
-             </div>
-             <p className="text-sm font-bold">{backendUpiData.payee}</p>
-             <p className="text-emerald-500 font-black text-2xl mt-2">₹{customerPayable}</p>
-             
-             <button 
-               onClick={onSuccess}
-               className="mt-6 w-full py-4 bg-emerald-500 rounded-xl font-bold hover:bg-emerald-400"
-             >
-               Payment Done
-             </button>
+            className={`absolute top-4 right-4 p-2 rounded-lg ${theme.button.ghost}`}
+          >
+            <X size={24} />
+          </button>
+          <h2 className="text-xl font-semibold mb-6">Payment</h2>
+          <div className="bg-white p-4 rounded-xl mb-6">
+            <img src={backendUpiData.qr} alt="UPI QR" className="w-48 h-48 object-contain" />
           </div>
-        ) : (
-          /* Input Screen */
-          <>
-            <div className="grid grid-cols-3 gap-2 mb-6">
-              {['CASH', 'UPI', 'CARD'].map(mode => (
-                <button
-                  key={mode}
-                  onClick={() => setPaymentMode(mode)}
-                  className={`py-3 rounded-xl border-2 text-xs font-bold ${
-                    paymentMode === mode 
-                      ? 'border-blue-600 bg-blue-600/10 text-white' 
-                      : 'border-slate-800 text-slate-400'
-                  }`}
+          <p className="text-base font-medium mb-1">{backendUpiData.payee || "Merchant"}</p>
+          <p className="text-3xl font-semibold mb-8">₹{grandTotal}</p>
+          <button 
+            onClick={onClose} 
+            className={`w-full py-3 rounded-lg font-medium text-sm flex items-center justify-center gap-2 ${theme.button.primary}`}
+          >
+            <CheckCircle size={20} /> Payment Done
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={`fixed inset-0 z-50 flex items-center justify-center ${theme.bg.overlay} p-4`} style={{ fontFamily: FONTS.sans }}>
+      <div className={`w-full max-w-md rounded-2xl flex flex-col ${COMMON_STYLES.modal(isDarkMode)}`}>
+        <div className={`p-6 flex justify-between items-center border-b ${theme.border.default}`}>
+          <div>
+            <h2 className="text-xl font-semibold">Checkout</h2>
+            <p className={`text-sm font-medium mt-1 ${theme.text.secondary}`}>Order #{orderId}</p>
+          </div>
+          <button 
+            onClick={onClose} 
+            className={`p-2 rounded-lg ${theme.button.ghost}`}
+          >
+            <X size={24} />
+          </button>
+        </div>
+        
+        <div className="p-6 space-y-6">
+          <div className={`p-5 rounded-xl border space-y-2 ${theme.border.default} ${theme.bg.subtle}`}>
+            <div className={`flex justify-between text-sm font-medium ${theme.text.secondary}`}>
+              <span>Subtotal</span>
+              <span>₹{cartSubtotal}</span>
+            </div>
+            <div className={`flex justify-between text-sm font-medium ${theme.text.secondary}`}>
+              <span>Discount</span>
+              <span>-₹{discount}</span>
+            </div>
+            <div className={`flex justify-between text-sm font-medium ${theme.text.secondary}`}>
+              <span>Tax</span>
+              <span>₹{Math.round(taxAmount)}</span>
+            </div>
+            <div className={`flex justify-between text-xl font-semibold pt-4 mt-2 border-t ${theme.border.default}`}>
+              <span>Total</span>
+              <span>₹{grandTotal}</span>
+            </div>
+          </div>
+          
+          <div>
+            <label className={`block text-xs font-medium uppercase mb-3 ${theme.text.secondary}`}>
+              Payment Method
+            </label>
+            <div className="grid grid-cols-3 gap-3">
+              {[
+                { id: 'cash', label: 'Cash' }, 
+                { id: 'upi', label: 'UPI' }, 
+                { id: 'card', label: 'Card' }
+              ].map((m) => (
+                <button 
+                  key={m.id} 
+                  onClick={() => setPaymentMethod(m.id)} 
+                  className={`flex flex-col items-center justify-center p-4 rounded-lg border font-medium gap-2 transition ${paymentMethod === m.id ? theme.button.primary : theme.button.secondary}`}
                 >
-                  {mode}
+                  {m.label}
                 </button>
               ))}
             </div>
-
-            <div className="min-h-[150px] flex flex-col items-center justify-center border-y border-slate-800/50 my-6">
-              {paymentMode === 'CASH' && (
-                <input
-                  ref={cashInputRef}
-                  type="number"
-                  value={cashReceived}
-                  onChange={(e) => setCashReceived(e.target.value)}
-                  placeholder="Cash Received"
-                  className="bg-transparent text-4xl font-black text-center outline-none w-full text-white"
-                />
-              )}
-              {paymentMode === 'UPI' && (
-                <div className="text-center">
-                    <QrCode size={48} className="mx-auto text-blue-500 mb-2" />
-                    <p className="text-slate-400 text-sm">Click Confirm to generate QR</p>
-                </div>
-              )}
-               {paymentMode === 'CARD' && (
-                <div className="text-center">
-                    <CreditCard size={48} className="mx-auto text-slate-500 mb-2" />
-                    <p className="text-slate-400 text-sm">Swipe Card on Terminal</p>
-                </div>
-              )}
-            </div>
-
-            <button 
-              disabled={loading}
-              onClick={handleConfirm}
-              className="w-full py-4 bg-blue-600 hover:bg-blue-500 rounded-2xl font-black shadow-lg"
-            >
-              {loading ? 'Generating...' : `Confirm ₹${customerPayable}`}
-            </button>
-          </>
-        )}
+          </div>
+          
+          <button 
+            onClick={handleConfirm} 
+            disabled={isProcessing} 
+            className={`w-full py-3 rounded-lg font-medium text-sm flex justify-center items-center gap-2 ${theme.button.primary}`}
+          >
+            {isProcessing ? <Loader className="animate-spin" /> : "Confirm Payment"}
+          </button>
+        </div>
       </div>
     </div>
   );

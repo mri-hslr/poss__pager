@@ -1,112 +1,38 @@
 import React, { useState, useEffect } from 'react';
-import { X, Save, RefreshCw } from 'lucide-react';
+import { X, Save, CreditCard, User } from 'lucide-react';
+import { getTheme, COMMON_STYLES } from './theme';
 
-// ✅ FIX: Add API_URL to props here
-export default function AdminSettingsModal({ open, onClose, API_URL }) {
-  
-  // ❌ DELETE THIS LINE if it exists:
-  // const API_URL = "http://localhost:3000"; 
-
-  const [settings, setSettings] = useState({
-    upi_id: '',
-    payee_name: '',
-    currency: 'INR'
-  });
+export default function AdminSettingsModal({ open, onClose, API_URL, restaurantId, isDarkMode }) {
+  const [upiId, setUpiId] = useState("");
+  const [payeeName, setPayeeName] = useState("");
   const [loading, setLoading] = useState(false);
-  const token = localStorage.getItem("auth_token");
+  const theme = getTheme(isDarkMode || true); // Default to dark mode for modal consistency
 
-  // 1. Load Settings on Open
   useEffect(() => {
     if (open) {
-      // ✅ Use the passed API_URL
-      fetch(`${API_URL}/settings`, {
-        headers: { Authorization: `Bearer ${token}` }
-      })
-      .then(res => res.json())
-      .then(data => {
-        if (data && !data.message) setSettings(data);
-      })
-      .catch(err => console.error("Failed to load settings", err));
+      const fetchSettings = async () => {
+        try { const token = localStorage.getItem("auth_token"); if (!API_URL) return; const res = await fetch(`${API_URL}/settings`, { headers: { Authorization: `Bearer ${token}` } }); if (res.ok) { const data = await res.json(); setUpiId(data.upi_id || ""); setPayeeName(data.payee_name || ""); } } catch (e) { console.error(e); }
+      };
+      fetchSettings();
     }
-  }, [open, API_URL, token]); // Add API_URL to dependencies
+  }, [open, API_URL]);
 
-  // 2. Save Settings
   const handleSave = async () => {
     setLoading(true);
-    try {
-      // ✅ Use the passed API_URL
-      const res = await fetch(`${API_URL}/settings`, {
-        method: 'PUT',
-        headers: { 
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}` 
-        },
-        body: JSON.stringify(settings)
-      });
-
-      if (res.ok) {
-        alert("Settings Saved!");
-        onClose();
-      } else {
-        alert("Failed to save settings");
-      }
-    } catch (error) {
-      console.error(error);
-      alert("Error saving settings");
-    } finally {
-      setLoading(false);
-    }
+    try { const token = localStorage.getItem("auth_token"); const res = await fetch(`${API_URL}/settings`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ upi_id: upiId, payee_name: payeeName, restaurantId }) }); if (!res.ok) throw new Error("Failed"); alert("Settings Saved!"); onClose(); } catch (e) { alert(e.message); } finally { setLoading(false); }
   };
 
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
-      <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 overflow-hidden">
-        
-        {/* Header */}
-        <div className="p-4 border-b dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-800/50">
-          <h2 className="font-black text-lg text-slate-700 dark:text-white">System Settings</h2>
-          <button onClick={onClose} className="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full transition-colors">
-            <X size={20} className="text-slate-500" />
-          </button>
-        </div>
-
-        {/* Body */}
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 font-sans">
+      <div className={`w-full max-w-md rounded-2xl shadow-2xl overflow-hidden ${COMMON_STYLES.modal(isDarkMode || true)}`}>
+        <div className={`p-5 border-b flex justify-between items-center ${theme.border.default}`}><h2 className="text-lg font-semibold">System Settings</h2><button onClick={onClose} className={`p-2 rounded-lg ${theme.button.ghost}`}><X size={20} /></button></div>
         <div className="p-6 space-y-4">
-          <div>
-            <label className="block text-xs font-bold uppercase text-slate-500 mb-1">UPI ID (For QR Code)</label>
-            <input 
-              value={settings.upi_id} 
-              onChange={e => setSettings({...settings, upi_id: e.target.value})} 
-              className="w-full p-3 bg-slate-100 dark:bg-slate-800 border-none rounded-xl font-bold dark:text-white focus:ring-2 focus:ring-blue-500 outline-none" 
-              placeholder="example@upi"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-bold uppercase text-slate-500 mb-1">Payee Name</label>
-            <input 
-              value={settings.payee_name} 
-              onChange={e => setSettings({...settings, payee_name: e.target.value})} 
-              className="w-full p-3 bg-slate-100 dark:bg-slate-800 border-none rounded-xl font-bold dark:text-white focus:ring-2 focus:ring-blue-500 outline-none" 
-              placeholder="Merchant Name"
-            />
-          </div>
+            <div><label className={`block text-xs font-medium uppercase mb-2 ${theme.text.secondary}`}>UPI ID</label><div className="relative"><CreditCard className={`absolute left-3 top-1/2 -translate-y-1/2 ${theme.text.secondary}`} size={18}/><input value={upiId} onChange={(e) => setUpiId(e.target.value)} placeholder="merchant@upi" className={`w-full pl-10 pr-4 py-2.5 ${COMMON_STYLES.input(isDarkMode || true)}`} /></div></div>
+            <div><label className={`block text-xs font-medium uppercase mb-2 ${theme.text.secondary}`}>Payee Name</label><div className="relative"><User className={`absolute left-3 top-1/2 -translate-y-1/2 ${theme.text.secondary}`} size={18}/><input value={payeeName} onChange={(e) => setPayeeName(e.target.value)} placeholder="Business Name" className={`w-full pl-10 pr-4 py-2.5 ${COMMON_STYLES.input(isDarkMode || true)}`} /></div></div>
         </div>
-
-        {/* Footer */}
-        <div className="p-4 border-t dark:border-slate-800 flex justify-end gap-3 bg-slate-50 dark:bg-slate-800/50">
-          <button onClick={onClose} className="px-4 py-2 font-bold text-slate-500 hover:text-slate-700">Cancel</button>
-          <button 
-            onClick={handleSave} 
-            disabled={loading}
-            className="px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl flex items-center gap-2 disabled:opacity-50"
-          >
-            {loading ? <RefreshCw className="animate-spin" size={18} /> : <Save size={18} />}
-            Save Changes
-          </button>
-        </div>
-
+        <div className={`p-5 border-t flex justify-end gap-3 ${theme.border.default} ${theme.bg.main}`}><button onClick={onClose} className={`px-4 py-2 rounded-lg font-medium ${theme.button.secondary}`}>Cancel</button><button onClick={handleSave} disabled={loading} className={`px-6 py-2 rounded-lg font-medium flex items-center gap-2 ${theme.button.primary}`}><Save size={18}/> {loading ? "Saving..." : "Save"}</button></div>
       </div>
     </div>
   );
