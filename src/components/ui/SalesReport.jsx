@@ -46,8 +46,6 @@ export default function SalesReport({ orders = [], history = [], products = [], 
     
     if ((method === 'UNKNOWN' || !method) && amount > 0) method = 'CASH';
 
-    // ✅ FIX: Standardize the Date for the Chart
-    // We prefer completedAt (history), then startedAt (active), then created_at (fallback)
     const activeDate = o.completedAt || o.startedAt || o.created_at || new Date().toISOString();
 
     return { 
@@ -56,7 +54,7 @@ export default function SalesReport({ orders = [], history = [], products = [], 
         method, 
         discount, 
         tax, 
-        activeDate, // Store this for sorting/filtering
+        activeDate,
         status: o.status || "COMPLETED" 
     };
   };
@@ -64,9 +62,8 @@ export default function SalesReport({ orders = [], history = [], products = [], 
   const allOrders = [...orders, ...history];
   
   const filteredOrders = allOrders
-    .map(repairOrderData) // Repair first so we have 'activeDate'
+    .map(repairOrderData)
     .filter(o => {
-      // ✅ FIX: Use the standardized 'activeDate'
       if (!o.activeDate) return false;
       const d = new Date(o.activeDate);
       return !isNaN(d.getTime()) && d.toLocaleDateString('en-CA') === reportDate;
@@ -77,7 +74,7 @@ export default function SalesReport({ orders = [], history = [], products = [], 
   const chartData = useMemo(() => {
     const hours = Array(24).fill(0);
     filteredOrders.forEach(o => { 
-        const h = new Date(o.activeDate).getHours(); // Use activeDate
+        const h = new Date(o.activeDate).getHours();
         hours[h] += o.amount; 
     });
     return hours;
@@ -114,69 +111,69 @@ export default function SalesReport({ orders = [], history = [], products = [], 
   };
 
   const theme = {
-    bgCard: isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200',
-    textMain: isDarkMode ? 'text-white' : 'text-slate-900',
-    textSec: isDarkMode ? 'text-slate-400' : 'text-slate-500',
+    bgCard: isDarkMode ? 'bg-black border-[#333]' : 'bg-white border-gray-200',
+    textMain: isDarkMode ? 'text-white' : 'text-black',
+    textSec: isDarkMode ? 'text-[#888]' : 'text-gray-600',
     rowClass: isDarkMode 
-        ? 'border-slate-700 text-slate-300 hover:bg-slate-700/50' 
-        : 'border-slate-200 text-slate-700 hover:bg-slate-50',     
+        ? 'border-[#333] text-white hover:bg-white/5' 
+        : 'border-gray-200 text-black hover:bg-gray-50',     
   };
 
   return (
-    <div className={`flex flex-col h-full font-sans animate-in fade-in zoom-in-95 duration-300`}>
+    <div className={`flex flex-col h-full font-['Geist',_sans-serif] antialiased animate-in fade-in zoom-in-95 duration-300`}>
         {/* HEADER */}
         <div className="flex justify-between items-center mb-6 shrink-0">
             <div>
-                <h1 className={`text-3xl font-black ${theme.textMain}`}>Dashboard</h1>
-                <p className={`text-sm font-bold ${theme.textSec}`}>Overview for {reportDate}</p>
+                <h1 className={`text-2xl font-semibold ${theme.textMain}`}>Dashboard</h1>
+                <p className={`text-sm font-medium ${theme.textSec}`}>Overview for {reportDate}</p>
             </div>
             
             <div className="flex gap-3">
-                <div className={`relative flex items-center gap-2 px-4 py-2 rounded-xl border-2 ${theme.bgCard} ${theme.textMain}`}>
-                    <Calendar size={18} className="text-blue-500"/>
-                    <span className="font-bold text-sm">{reportDate}</span>
+                <div className={`relative flex items-center gap-2 px-4 py-2 rounded-lg border ${theme.bgCard} ${theme.textMain}`}>
+                    <Calendar size={18} className={theme.textSec}/>
+                    <span className="font-medium text-sm">{reportDate}</span>
                     <input type="date" value={reportDate} onChange={(e) => setReportDate(e.target.value)} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"/>
                 </div>
-                <button onClick={exportData} className={`px-4 py-2 rounded-xl border-2 ${theme.bgCard} ${theme.textMain} flex items-center gap-2 hover:border-blue-500 transition-all active:scale-95`}>
-                    <Download size={18}/> <span className="font-bold text-sm">Export CSV</span>
+                <button onClick={exportData} className={`px-4 py-2 rounded-lg border ${theme.bgCard} ${theme.textMain} flex items-center gap-2 hover:border-white/20 transition-all active:scale-[0.98]`}>
+                    <Download size={18}/> <span className="font-medium text-sm">Export CSV</span>
                 </button>
             </div>
         </div>
 
         {/* METRICS */}
         <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4 mb-6 shrink-0">
-            <div className={`p-5 rounded-2xl border-2 ${theme.bgCard}`}>
-                <div className={`flex items-center gap-2 mb-2 ${theme.textSec}`}><Wallet size={16}/><span className="text-xs font-black uppercase">Revenue</span></div>
-                <div className={`text-3xl font-black ${theme.textMain}`}>₹{totalRevenue}</div>
+            <div className={`p-5 rounded-xl border ${theme.bgCard}`}>
+                <div className={`flex items-center gap-2 mb-2 ${theme.textSec}`}><Wallet size={16}/><span className="text-xs font-medium uppercase">Revenue</span></div>
+                <div className={`text-2xl font-semibold ${theme.textMain}`}>₹{totalRevenue}</div>
             </div>
-            <div className={`p-5 rounded-2xl border-2 ${theme.bgCard}`}>
-                <div className={`flex items-center gap-2 mb-2 ${theme.textSec}`}><Receipt size={16}/><span className="text-xs font-black uppercase">Tax</span></div>
-                <div className={`text-3xl font-black text-orange-500`}>₹{Math.round(totalTax)}</div>
+            <div className={`p-5 rounded-xl border ${theme.bgCard}`}>
+                <div className={`flex items-center gap-2 mb-2 ${theme.textSec}`}><Receipt size={16}/><span className="text-xs font-medium uppercase">Tax</span></div>
+                <div className={`text-2xl font-semibold ${theme.textMain}`}>₹{Math.round(totalTax)}</div>
             </div>
-            <div className={`p-5 rounded-2xl border-2 ${theme.bgCard}`}>
-                <div className={`flex items-center gap-2 mb-2 ${theme.textSec}`}><Smartphone size={16}/><span className="text-xs font-black uppercase">Digital</span></div>
-                <div className="text-3xl font-black text-blue-500">₹{totalDigital}</div>
+            <div className={`p-5 rounded-xl border ${theme.bgCard}`}>
+                <div className={`flex items-center gap-2 mb-2 ${theme.textSec}`}><Smartphone size={16}/><span className="text-xs font-medium uppercase">Digital</span></div>
+                <div className={`text-2xl font-semibold ${theme.textMain}`}>₹{totalDigital}</div>
             </div>
-            <div className={`p-5 rounded-2xl border-2 ${theme.bgCard}`}>
-                <div className={`flex items-center gap-2 mb-2 ${theme.textSec}`}><Banknote size={16}/><span className="text-xs font-black uppercase">Cash</span></div>
-                <div className="text-3xl font-black text-green-500">₹{totalCash}</div>
+            <div className={`p-5 rounded-xl border ${theme.bgCard}`}>
+                <div className={`flex items-center gap-2 mb-2 ${theme.textSec}`}><Banknote size={16}/><span className="text-xs font-medium uppercase">Cash</span></div>
+                <div className={`text-2xl font-semibold ${theme.textMain}`}>₹{totalCash}</div>
             </div>
-            <div className={`p-5 rounded-2xl border-2 ${theme.bgCard}`}>
-                <div className={`flex items-center gap-2 mb-2 ${theme.textSec}`}><TrendingUp size={16}/><span className="text-xs font-black uppercase">Orders</span></div>
-                <div className={`text-3xl font-black ${theme.textMain}`}>{filteredOrders.length}</div>
+            <div className={`p-5 rounded-xl border ${theme.bgCard}`}>
+                <div className={`flex items-center gap-2 mb-2 ${theme.textSec}`}><TrendingUp size={16}/><span className="text-xs font-medium uppercase">Orders</span></div>
+                <div className={`text-2xl font-semibold ${theme.textMain}`}>{filteredOrders.length}</div>
             </div>
         </div>
 
         {/* GRAPH */}
-        <div className={`mb-6 rounded-2xl border-2 ${theme.bgCard} p-6 shrink-0`}>
-            <div className="flex items-center gap-2 mb-6"><TrendingUp size={20} className="text-blue-500"/><h2 className={`font-black ${theme.textMain}`}>Hourly Activity</h2></div>
+        <div className={`mb-6 rounded-xl border ${theme.bgCard} p-6 shrink-0`}>
+            <div className="flex items-center gap-2 mb-6"><TrendingUp size={20} className={theme.textSec}/><h2 className={`font-semibold ${theme.textMain}`}>Hourly Activity</h2></div>
             <div className="custom-scrollbar overflow-x-auto pb-2">
                 <div className="h-40 flex gap-3 items-end min-w-[600px] md:min-w-0">
                     {chartData.map((val, h) => (
                         <div key={h} className="flex-1 flex flex-col justify-end items-center group relative h-full">
-                            {val > 0 && <div className="absolute bottom-full mb-2 bg-slate-800 text-white text-xs py-1 px-2 rounded font-bold z-10">₹{val}</div>}
-                            <div className={`w-full rounded-t-lg transition-all duration-500 ${val > 0 ? 'bg-blue-500' : 'bg-slate-200 dark:bg-slate-700/50'}`} style={{height: `${(val / maxSales) * 100}%`, minHeight: '4px'}}></div>
-                            <span className={`text-[10px] font-bold ${theme.textSec} mt-2`}>{h}:00</span>
+                            {val > 0 && <div className={`absolute bottom-full mb-2 ${isDarkMode ? 'bg-white text-black' : 'bg-black text-white'} text-xs py-1 px-2 rounded font-medium z-10`}>₹{val}</div>}
+                            <div className={`w-full rounded-t-lg transition-all duration-500 ${val > 0 ? (isDarkMode ? 'bg-white' : 'bg-black') : (isDarkMode ? 'bg-white/10' : 'bg-gray-200')}`} style={{height: `${(val / maxSales) * 100}%`, minHeight: '4px'}}></div>
+                            <span className={`text-[10px] font-medium ${theme.textSec} mt-2`}>{h}:00</span>
                         </div>
                     ))}
                 </div>
@@ -184,39 +181,38 @@ export default function SalesReport({ orders = [], history = [], products = [], 
         </div>
 
         {/* HISTORY */}
-        <div className={`flex-1 overflow-hidden rounded-2xl border-2 ${theme.bgCard} flex flex-col`}>
-            <div className={`p-4 border-b ${isDarkMode ? 'border-slate-700' : 'border-slate-200'} font-bold flex items-center gap-2 ${theme.textMain}`}>
-                <Banknote size={20} className="text-slate-400"/> Transaction History
+        <div className={`flex-1 overflow-hidden rounded-xl border ${theme.bgCard} flex flex-col`}>
+            <div className={`p-4 border-b ${isDarkMode ? 'border-[#333]' : 'border-gray-200'} font-semibold flex items-center gap-2 ${theme.textMain}`}>
+                <Banknote size={20} className={theme.textSec}/> Transaction History
             </div>
             <div className="flex-1 overflow-y-auto p-2">
                 <table className="w-full text-sm text-left border-collapse">
-                    <thead className={`${theme.textSec} text-xs uppercase sticky top-0 ${isDarkMode ? 'bg-slate-800' : 'bg-white'} z-10`}>
+                    <thead className={`${theme.textSec} text-xs uppercase sticky top-0 ${isDarkMode ? 'bg-black' : 'bg-white'} z-10`}>
                         <tr>
-                            <th className="p-3 pl-4">ID</th>
-                            <th className="p-3">Time</th>
-                            <th className="p-3">Method</th>
-                            <th className="p-3 text-right">Disc</th>
-                            <th className="p-3 text-right">Tax</th>
-                            <th className="p-3 text-right pr-4">Total</th>
+                            <th className="p-3 pl-4 font-medium">ID</th>
+                            <th className="p-3 font-medium">Time</th>
+                            <th className="p-3 font-medium">Method</th>
+                            <th className="p-3 text-right font-medium">Disc</th>
+                            <th className="p-3 text-right font-medium">Tax</th>
+                            <th className="p-3 text-right pr-4 font-medium">Total</th>
                         </tr>
                     </thead>
-                    <tbody className={`divide-y ${isDarkMode ? 'divide-slate-700' : 'divide-slate-100'}`}>
+                    <tbody className={`divide-y ${isDarkMode ? 'divide-[#333]' : 'divide-gray-100'}`}>
                         {filteredOrders.length === 0 ? (
-                            <tr><td colSpan="6" className={`p-8 text-center font-bold ${theme.textSec}`}>No transactions today.</td></tr>
+                            <tr><td colSpan="6" className={`p-8 text-center font-medium ${theme.textSec}`}>No transactions today.</td></tr>
                         ) : (
                             filteredOrders.map(o => (
                                 <tr key={o.id} className={`border-b transition-colors cursor-default ${theme.rowClass}`}>
-                                    <td className="p-3 pl-4 font-mono font-bold opacity-70">#{String(o.id).slice(-4)}</td>
-                                    <td className="p-3 font-bold">{new Date(o.activeDate).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</td>
+                                    <td className="p-3 pl-4 font-mono font-medium opacity-70">#{String(o.id).slice(-4)}</td>
+                                    <td className="p-3 font-medium">{new Date(o.activeDate).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</td>
                                     <td className="p-3">
-                                        <span className={`px-2 py-1 rounded text-xs font-black uppercase 
-                                            ${o.method === 'CASH' ? 'bg-green-500/10 text-green-500' : 'bg-blue-500/10 text-blue-500'}`}>
+                                        <span className={`px-2 py-1 rounded text-xs font-medium uppercase ${o.method === 'CASH' ? 'bg-white/10 text-white border border-white/10' : 'bg-white/10 text-white border border-white/10'}`}>
                                             {o.method}
                                         </span>
                                     </td>
-                                    <td className="p-3 text-right text-red-400">{o.discount > 0 ? `-${o.discount}` : '-'}</td>
-                                    <td className="p-3 text-right text-orange-400">{o.tax > 0 ? o.tax : '-'}</td>
-                                    <td className="p-3 pr-4 text-right font-black">₹{o.amount}</td>
+                                    <td className="p-3 text-right text-[#888]">{o.discount > 0 ? `-${o.discount}` : '-'}</td>
+                                    <td className="p-3 text-right text-[#888]">{o.tax > 0 ? o.tax : '-'}</td>
+                                    <td className="p-3 pr-4 text-right font-semibold">{o.amount}</td>
                                 </tr>
                             ))
                         )}

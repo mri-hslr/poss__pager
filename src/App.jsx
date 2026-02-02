@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import RestaurantVendorUI from './components/ui/RestaurantVendorUI';
-import LoginView from './components/ui/LoginView'; // ✅ IMPORTED LOGIN VIEW
+import LoginView from './components/ui/LoginView';
 
 // ✅ DYNAMIC BACKEND CONNECTION
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
@@ -8,6 +8,16 @@ const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 export default function App() {
   const [user, setUser] = useState(null);
   const [isDarkMode, setIsDarkMode] = useState(true);
+
+  // ✅ APPLY DARK MODE TO HTML (THIS WAS MISSING)
+  useEffect(() => {
+    const root = document.documentElement;
+    if (isDarkMode) {
+      root.classList.add("dark");
+    } else {
+      root.classList.remove("dark");
+    }
+  }, [isDarkMode]);
 
   // 1. Check for Session on Load
   useEffect(() => {
@@ -20,15 +30,13 @@ export default function App() {
     }
   }, []);
 
-  // 2. Handle Login Success (Called by LoginView)
+  // 2. Handle Login Success
   const handleLoginSuccess = (userData, token) => {
     const userRole = userData?.role || "cashier";
     
-    // Save to LocalStorage
     localStorage.setItem("auth_token", token);
     localStorage.setItem("user_role", userRole);
     
-    // Update State
     setUser({ ...userData, token });
   };
 
@@ -41,7 +49,6 @@ export default function App() {
 
   // --- RENDER ---
 
-  // If Logged In: Show Main POS UI
   if (user) {
     return (
       <RestaurantVendorUI 
@@ -54,7 +61,6 @@ export default function App() {
     );
   }
 
-  // If Logged Out: Show Login View
   return (
     <LoginView 
       onLogin={handleLoginSuccess} 
