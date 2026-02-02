@@ -1,50 +1,104 @@
 import React from 'react';
-import { X, ChefHat, Check, Clock } from 'lucide-react';
-import OrderTimer from './OrderTimer';
+import { X, ChefHat, Check, BellRing } from 'lucide-react';
+import { getTheme, COMMON_STYLES, FONTS } from './theme';
 
-export default function ActiveOrdersDrawer({ isOpen, onClose, orders, onCompleteOrder, isDarkMode }) {
+export default function ActiveOrdersDrawer({ 
+  isOpen, onClose, orders = [], onCompleteOrder, onCallCustomer, isDarkMode 
+}) {
   if (!isOpen) return null;
-
-  const theme = {
-    bgCard: isDarkMode ? 'bg-slate-900' : 'bg-white',
-    textMain: isDarkMode ? 'text-slate-100' : 'text-stone-800',
-    textSec: isDarkMode ? 'text-slate-400' : 'text-stone-500',
-    border: isDarkMode ? 'border-slate-800' : 'border-stone-200',
-    accent: isDarkMode ? 'bg-blue-600' : 'bg-stone-900',
-  };
+  const theme = getTheme(isDarkMode);
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-start animate-in fade-in duration-200">
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className={`relative ${theme.bgCard} ${theme.textMain} w-full md:w-full md:max-w-md h-full shadow-2xl flex flex-col`} onClick={e => e.stopPropagation()}>
-        <div className={`p-4 border-b ${theme.border} flex justify-between items-center`}>
-          <h2 className="font-bold text-lg flex items-center gap-2"><ChefHat className="text-orange-500" /> Active Orders</h2>
-          <button onClick={onClose} className={`p-2 hover:bg-gray-500/10 rounded-full`}><X size={20} /></button>
-        </div>
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          {orders.map((o) => (
-            <div key={o.id} className={`border ${theme.border} ${theme.bgCard} rounded-xl shadow-sm overflow-hidden`}>
-              <div className={`${isDarkMode ? 'bg-slate-800' : 'bg-stone-50'} p-3 flex justify-between items-center border-b ${theme.border}`}>
-                <div className="flex gap-2 items-center">
-                  <span className={`font-bold ${theme.accent} text-white px-2 py-0.5 rounded text-sm`}>T-{o.token}</span>
-                  <span className={`text-xs font-bold ${theme.textSec}`}>#{o.displayId}</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <OrderTimer startedAt={o.startedAt} />
-                  <button onClick={() => onCompleteOrder(o.id)} className="bg-green-100 hover:bg-green-200 text-green-700 p-1.5 rounded-full"><Check size={16} /></button>
-                </div>
-              </div>
-              <div className="p-3">
-                {o.items.map((i) => (
-                  <div key={i.id} className={`flex justify-between text-sm py-1 border-b border-dashed last:border-0 ${theme.border}`}>
-                    <span>{i.name} <span className="text-stone-400 text-xs">x{i.quantity}</span></span>
-                  </div>
-                ))}
-                <div className="text-right font-bold mt-2">₹{o.total}</div>
-              </div>
+    <div className="fixed inset-0 z-50 flex justify-end animate-in fade-in duration-200" style={{ fontFamily: FONTS.sans }}>
+      <div className={`absolute inset-0 ${theme.bg.overlay}`} onClick={onClose} />
+      <div 
+        className={`relative w-full sm:w-[450px] h-full flex flex-col ${theme.bg.card} border-l ${theme.border.default}`} 
+        onClick={e => e.stopPropagation()}
+      >
+        <div className={`p-6 flex justify-between items-center ${theme.border.default} border-b`}>
+          <div className="flex items-center gap-3">
+            <div className={`p-2 rounded-lg ${theme.bg.subtle}`}>
+              <ChefHat size={24} />
             </div>
-          ))}
-          {orders.length === 0 && <div className={`text-center mt-10 ${theme.textSec}`}>No active orders.</div>}
+            <div>
+              <h2 className="font-semibold text-xl tracking-tight">Kitchen</h2>
+              <p className={`text-xs font-medium uppercase tracking-wider ${theme.text.tertiary}`}>
+                Live Orders
+              </p>
+            </div>
+          </div>
+          <button 
+            onClick={onClose} 
+            className={`p-2 rounded-full ${theme.button.ghost}`}
+          >
+            <X size={20} />
+          </button>
+        </div>
+        
+        <div className={`flex-1 overflow-y-auto p-5 space-y-4 ${theme.bg.main}`}>
+          {orders.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-[50vh] space-y-4">
+              <ChefHat size={64} className={theme.text.muted} />
+              <p className={`font-medium ${theme.text.secondary}`}>No active orders</p>
+            </div>
+          ) : (
+            orders.map((order) => (
+              <div 
+                key={order.id} 
+                className={`rounded-xl p-5 border relative overflow-hidden ${COMMON_STYLES.card(isDarkMode)}`}
+              >
+                <div className={`absolute left-0 top-0 bottom-0 w-1 ${theme.bg.main}`}></div>
+                
+                <div className="flex justify-between items-start mb-4 pl-2">
+                  <div className="flex flex-col">
+                    <span className={`text-xs font-medium uppercase tracking-wider mb-1 ${theme.text.secondary}`}>
+                      Token
+                    </span>
+                    <span className={`text-2xl font-semibold ${theme.text.main} px-3 py-0.5 rounded w-fit`}>
+                      #{order.token}
+                    </span>
+                  </div>
+                  <div className={`px-3 py-1 rounded-lg border ${theme.border.default} ${theme.bg.subtle}`}>
+                    <span className={`text-xs font-mono font-medium ${theme.text.secondary}`}>
+                      {new Date(order.startedAt || order.created_at || Date.now()).toLocaleTimeString([], { 
+                        hour: '2-digit', 
+                        minute: '2-digit' 
+                      })}
+                    </span>
+                  </div>
+                </div>
+                
+                <div className="space-y-3 pl-2 mb-6">
+                  {order.items.map((item, idx) => (
+                    <div 
+                      key={idx} 
+                      className={`flex justify-between items-center text-sm border-b border-dashed pb-2 last:border-0 last:pb-0 ${theme.border.default}`}
+                    >
+                      <span className="font-medium">{item.name}</span>
+                      <span className={`font-semibold px-2 py-0.5 rounded text-xs ${COMMON_STYLES.badge(isDarkMode)}`}>
+                        x{item.quantity}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                
+                <div className="grid grid-cols-2 gap-3 pl-2">
+                  <button 
+                    onClick={() => onCallCustomer ? onCallCustomer(order.token) : alert(`Calling ${order.token}`)} 
+                    className={`flex items-center justify-center gap-2 py-2.5 rounded-lg border font-medium text-sm transition-all ${theme.button.secondary}`}
+                  >
+                    <BellRing size={18} /> Call
+                  </button>
+                  <button 
+                    onClick={() => onCompleteOrder(order.id)} 
+                    className={`flex items-center justify-center gap-2 py-2.5 rounded-lg font-medium text-sm transition-all ${theme.button.primary}`}
+                  >
+                    <Check size={18} strokeWidth={3} /> Done
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </div>
     </div>
