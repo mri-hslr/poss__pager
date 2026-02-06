@@ -3,7 +3,17 @@ import { X, CheckCircle, Loader } from 'lucide-react';
 import { getTheme, COMMON_STYLES, FONTS } from './theme';
 
 export default function CheckoutModal({ 
-  isOpen, onClose, onConfirm, cartSubtotal, taxAmount, discount, grandTotal, orderId, isDarkMode, backendUpiData 
+  isOpen, 
+  onClose, 
+  onConfirm, 
+  cartSubtotal, 
+  taxAmount, 
+  discount, 
+  grandTotal, 
+  orderId, 
+  isDarkMode, 
+  backendUpiData,
+  onPaymentComplete // ✅ Receive the new success handler
 }) {
   const [paymentMethod, setPaymentMethod] = useState('cash');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -24,6 +34,7 @@ export default function CheckoutModal({
     setIsProcessing(false); 
   };
 
+  // ─── UPI QR VIEW ───
   if (backendUpiData) {
     return (
       <div className={`fixed inset-0 z-50 flex items-center justify-center ${theme.bg.overlay} p-4`} style={{ fontFamily: FONTS.sans }}>
@@ -35,13 +46,16 @@ export default function CheckoutModal({
             <X size={24} />
           </button>
           <h2 className="text-xl font-semibold mb-6">Payment</h2>
-          <div className="bg-white p-4 rounded-xl mb-6">
+          <div className="bg-white p-4 rounded-xl mb-6 shadow-inner border">
+            {/* QR Code */}
             <img src={backendUpiData.qr} alt="UPI QR" className="w-48 h-48 object-contain" />
           </div>
-          <p className="text-base font-medium mb-1">{backendUpiData.payee || "Merchant"}</p>
-          <p className="text-3xl font-semibold mb-8">₹{grandTotal}</p>
+          <p className="text-base font-medium mb-1 opacity-75">{backendUpiData.payee || "Merchant"}</p>
+          <p className="text-3xl font-bold mb-8">₹{grandTotal}</p>
+          
+          {/* ✅ FIX: Call onPaymentComplete instead of onClose */}
           <button 
-            onClick={onClose} 
+            onClick={onPaymentComplete} 
             className={`w-full py-3 rounded-lg font-medium text-sm flex items-center justify-center gap-2 ${theme.button.primary}`}
           >
             <CheckCircle size={20} /> Payment Done
@@ -51,6 +65,7 @@ export default function CheckoutModal({
     );
   }
 
+  // ─── STANDARD CHECKOUT VIEW ───
   return (
     <div className={`fixed inset-0 z-50 flex items-center justify-center ${theme.bg.overlay} p-4`} style={{ fontFamily: FONTS.sans }}>
       <div className={`w-full max-w-md rounded-2xl flex flex-col ${COMMON_STYLES.modal(isDarkMode)}`}>
