@@ -1,30 +1,66 @@
-import React, { useState, useMemo } from 'react';
-import { Calendar, Download, TrendingUp, Banknote, Smartphone, Wallet, Receipt } from 'lucide-react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { Download, TrendingUp, Banknote, Smartphone, Wallet, Receipt, Loader2 } from 'lucide-react';
 import { getTheme, COMMON_STYLES, FONTS } from './theme';
+import DatePicker from './DatePicker';
 
-export default function SalesReport({ orders = [], history = [], products = [], isDarkMode }) {
+export default function SalesReport({ 
+    orders = [], 
+    products = [], 
+    isDarkMode,
+    API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000"
+}) {
   const theme = getTheme(isDarkMode);
+  const token = localStorage.getItem("auth_token");
   
   const getLocalDate = () => {
-    if (typeof window === 'undefined') return new Date().toISOString().split('T')[0];
-    return new Date().toLocaleDateString('en-CA');
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   };
 
-  const [reportDate, setReportDate] = useState(getLocalDate());
+  const todayStr = getLocalDate();
+  const [dateRange, setDateRange] = useState({ from: todayStr, to: todayStr });
+  const [history, setHistory] = useState([]);
+  const [loading, setLoading] = useState(false);
 
-  // --- 🧠 SMART DATA NORMALIZER ---
+  useEffect(() => {
+    const fetchHistory = async () => {
+        if (!token || !dateRange.from) return; 
+
+        setLoading(true);
+        try {
+            const end = dateRange.to || dateRange.from;
+            const res = await fetch(`${API_URL}/orders/history?startDate=${dateRange.from}&endDate=${end}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            
+            if (res.ok) {
+                const data = await res.json();
+                setHistory(data);
+            } else {
+                console.error("Failed to fetch history:", res.status);
+                setHistory([]);
+            }
+        } catch (e) {
+            console.error("Sales Fetch Error:", e);
+        } finally {
+            setLoading(false);
+        }
+    };
+    
+    fetchHistory();
+  }, [dateRange, API_URL, token]);
+
   const repairOrderData = (o) => {
     let amount = 0;
-    
-    // 1. Get Totals
     if (o.total) amount = Number(o.total);
     else if (o.total_amount) amount = Number(o.total_amount);
-    else if (o.financials?.finalPayable) amount = Number(o.financials.finalPayable);
     
-    let discount = Number(o.discount || o.financials?.discount || 0);
-    let tax = Number(o.tax || o.financials?.taxAmount || 0);
+    let discount = Number(o.discount || 0);
+    let tax = Number(o.tax || 0);
     
-    // 2. Failsafe for missing amounts
     if (amount === 0 && o.items && Array.isArray(o.items)) {
       const rawSubtotal = o.items.reduce((sum, item) => {
         let price = Number(item.price || 0);
@@ -40,15 +76,14 @@ export default function SalesReport({ orders = [], history = [], products = [], 
       amount = Math.round(afterDisc + tax);
     }
 
-    // 3. Fix Payment Method
     let method = 'unknown';
     if (o.paymentMethod) method = o.paymentMethod.toUpperCase();
     else if (o.payment_method) method = o.payment_method.toUpperCase();
-    else if (o.payment?.method) method = o.payment.method.toUpperCase();
+    else if (o.payment_status === 'paid') method = 'PAID';
     
     if ((method === 'UNKNOWN' || !method) && amount > 0) method = 'CASH';
 
-    const activeDate = o.completedAt || o.startedAt || o.created_at || new Date().toISOString();
+    const activeDate = o.created_at || o.completedAt || new Date().toISOString();
 
     return { 
         ...o, 
@@ -57,56 +92,90 @@ export default function SalesReport({ orders = [], history = [], products = [], 
         discount, 
         tax, 
         activeDate,
-        status: o.status || "COMPLETED" 
+        items: o.items || [], 
+        status: o.status || o.payment_status || "COMPLETED" 
     };
   };
 
-  const allOrders = [...orders, ...history];
+  const combinedOrders = useMemo(() => {
+      const all = [...orders, ...history];
+      const unique = new Map();
+      all.forEach(o => unique.set(o.id, o));
+      return Array.from(unique.values());
+  }, [orders, history]);
   
-  const filteredOrders = allOrders
+  const filteredOrders = useMemo(() => 
+    combinedOrders
     .map(repairOrderData)
     .filter(o => {
       if (!o.activeDate) return false;
       const d = new Date(o.activeDate);
-      return !isNaN(d.getTime()) && d.toLocaleDateString('en-CA') === reportDate;
+      if (isNaN(d.getTime())) return false;
+      
+      const orderTime = d.getTime();
+      const startTime = new Date(dateRange.from).setHours(0,0,0,0);
+      const endTime = new Date(dateRange.to || dateRange.from).setHours(23,59,59,999);
+
+      return orderTime >= startTime && orderTime <= endTime;
     })
-    .sort((a, b) => new Date(b.activeDate) - new Date(a.activeDate));
+    .sort((a, b) => new Date(b.activeDate) - new Date(a.activeDate)), 
+  [combinedOrders, dateRange, products]);
 
-  // --- CALCULATIONS ---
   const chartData = useMemo(() => {
-    const hours = Array(24).fill(0);
-    filteredOrders.forEach(o => { 
-        const h = new Date(o.activeDate).getHours();
-        hours[h] += o.amount; 
-    });
-    return hours;
-  }, [filteredOrders]);
+    const isSingleDay = dateRange.from === dateRange.to;
+    
+    if (isSingleDay) {
+        const hours = Array(24).fill(0);
+        filteredOrders.forEach(o => { 
+            const h = new Date(o.activeDate).getHours();
+            hours[h] += o.amount; 
+        });
+        return { labels: Array.from({length:24},(_,i)=>`${i}:00`), data: hours, type: 'Hourly' };
+    } else {
+        const dailyMap = {};
+        // Generate array of dates between range to ensure 0-value days are shown
+        let curr = new Date(dateRange.from);
+        const end = new Date(dateRange.to);
+        while (curr <= end) {
+            const dateStr = curr.toLocaleDateString('en-US', {month:'short', day:'numeric'});
+            dailyMap[dateStr] = 0;
+            curr.setDate(curr.getDate() + 1);
+        }
 
-  const maxSales = Math.max(...chartData, 100);
+        filteredOrders.forEach(o => {
+            const dayStr = new Date(o.activeDate).toLocaleDateString('en-US', {month:'short', day:'numeric'});
+            if (dailyMap[dayStr] !== undefined) dailyMap[dayStr] += o.amount;
+        });
+        return { 
+            labels: Object.keys(dailyMap), 
+            data: Object.values(dailyMap),
+            type: 'Daily'
+        };
+    }
+  }, [filteredOrders, dateRange]);
+
+  const maxSales = Math.max(...chartData.data, 100);
   const totalRevenue = filteredOrders.reduce((sum, o) => sum + o.amount, 0);
   const totalTax = filteredOrders.reduce((sum, o) => sum + o.tax, 0);
-  
   const totalCash = filteredOrders.filter(o => o.method === 'CASH').reduce((sum, o) => sum + o.amount, 0);
   const totalDigital = filteredOrders.filter(o => o.method !== 'CASH').reduce((sum, o) => sum + o.amount, 0);
 
   const exportData = () => {
-    if (filteredOrders.length === 0) { alert("No data"); return; }
-    const headers = ["ID", "Time", "Items", "Subtotal", "Discount", "Tax", "Total", "Method"];
+    if (filteredOrders.length === 0) { alert("No data to export"); return; }
+    const headers = ["ID", "Time", "Items", "Total", "Method", "Status"];
     const rows = filteredOrders.map(o => [
         o.id, 
-        new Date(o.activeDate).toLocaleTimeString(), 
+        new Date(o.activeDate).toLocaleString(), 
         `"${o.items?.map(i => `${i.name}(${i.quantity})`).join('|') || ''}"`, 
-        (o.amount - o.tax + o.discount).toFixed(2), 
-        o.discount,
-        o.tax,
         o.amount, 
-        o.method
+        o.method,
+        o.status
     ].join(","));
     
     const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows].join("\n");
     const link = document.createElement("a");
     link.setAttribute("href", encodeURI(csvContent));
-    link.setAttribute("download", `Sales_${reportDate}.csv`);
+    link.setAttribute("download", `Sales_${dateRange.from}_to_${dateRange.to}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -114,24 +183,17 @@ export default function SalesReport({ orders = [], history = [], products = [], 
 
   return (
     <div className={`flex flex-col h-full antialiased animate-in fade-in zoom-in-95 duration-300`} style={{ fontFamily: FONTS.sans }}>
-        {/* HEADER */}
         <div className="flex justify-between items-center mb-6 shrink-0">
             <div>
                 <h1 className={`text-2xl font-semibold ${theme.text.main}`}>Dashboard</h1>
-                <p className={`text-sm ${theme.text.secondary}`}>Overview for {reportDate}</p>
+                <p className={`text-sm ${theme.text.secondary} flex items-center gap-2`}>
+                    Overview {dateRange.from === dateRange.to ? `for ${dateRange.from}` : `from ${dateRange.from} to ${dateRange.to}`}
+                    {loading && <span className="inline-flex items-center text-xs text-blue-500 animate-pulse"><Loader2 size={12} className="mr-1 animate-spin"/> Syncing...</span>}
+                </p>
             </div>
             
             <div className="flex gap-3">
-                <div className={`relative flex items-center gap-2 px-4 py-2 rounded-lg border ${COMMON_STYLES.card(isDarkMode)}`}>
-                    <Calendar size={18} className={theme.text.secondary}/>
-                    <span className={`text-sm ${theme.text.main}`}>{reportDate}</span>
-                    <input 
-                        type="date" 
-                        value={reportDate} 
-                        onChange={(e) => setReportDate(e.target.value)} 
-                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                    />
-                </div>
+                <DatePicker value={dateRange} onChange={setDateRange} isDarkMode={isDarkMode} />
                 <button 
                     onClick={exportData} 
                     className={`px-4 py-2 rounded-lg border flex items-center gap-2 transition-all ${theme.button.secondary}`}
@@ -141,7 +203,6 @@ export default function SalesReport({ orders = [], history = [], products = [], 
             </div>
         </div>
 
-        {/* METRICS */}
         <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4 mb-6 shrink-0">
             {[
                 { icon: Wallet, label: 'Revenue', value: `₹${totalRevenue}` },
@@ -160,16 +221,16 @@ export default function SalesReport({ orders = [], history = [], products = [], 
             ))}
         </div>
 
-        {/* GRAPH */}
         <div className={`mb-6 rounded-xl border p-6 shrink-0 ${COMMON_STYLES.card(isDarkMode)}`}>
             <div className="flex items-center gap-2 mb-6">
                 <TrendingUp size={20} className={theme.text.secondary}/>
-                <h2 className={`font-semibold ${theme.text.main}`}>Hourly Activity</h2>
+                <h2 className={`font-semibold ${theme.text.main}`}>{chartData.type} Activity</h2>
             </div>
             <div className="overflow-x-auto pb-2">
                 <div className="h-40 flex gap-3 items-end min-w-[600px] md:min-w-0">
-                    {chartData.map((val, h) => (
-                        <div key={h} className="flex-1 flex flex-col justify-end items-center group relative h-full">
+                    {chartData.data.map((val, idx) => (
+                        // ✅ FIX: Added max-w-[60px] to limit bar width
+                        <div key={idx} className="flex-1 max-w-[60px] flex flex-col justify-end items-center group relative h-full">
                             {val > 0 && (
                                 <div className={`absolute bottom-full mb-2 px-2 py-1 rounded text-xs z-10 ${isDarkMode ? 'bg-white text-black' : 'bg-black text-white'}`}>
                                     ₹{val}
@@ -179,14 +240,15 @@ export default function SalesReport({ orders = [], history = [], products = [], 
                                 className={`w-full rounded-t transition-all duration-500 ${val > 0 ? (isDarkMode ? 'bg-white' : 'bg-black') : theme.bg.subtle}`} 
                                 style={{height: `${(val / maxSales) * 100}%`, minHeight: '4px'}}
                             />
-                            <span className={`text-[10px] ${theme.text.secondary} mt-2`}>{h}:00</span>
+                            <span className={`text-[10px] ${theme.text.secondary} mt-2 whitespace-nowrap`}>
+                                {chartData.labels[idx]}
+                            </span>
                         </div>
                     ))}
                 </div>
             </div>
         </div>
 
-        {/* HISTORY */}
         <div className={`flex-1 overflow-hidden rounded-xl border flex flex-col ${COMMON_STYLES.card(isDarkMode)}`}>
             <div className={`p-4 border-b font-semibold flex items-center gap-2 ${theme.border.default} ${theme.text.main}`}>
                 <Banknote size={20} className={theme.text.secondary}/> Transaction History
@@ -207,7 +269,7 @@ export default function SalesReport({ orders = [], history = [], products = [], 
                         {filteredOrders.length === 0 ? (
                             <tr>
                                 <td colSpan="6" className={`p-8 text-center ${theme.text.secondary}`}>
-                                    No transactions today.
+                                    {loading ? "Loading..." : `No transactions found.`}
                                 </td>
                             </tr>
                         ) : (
@@ -217,7 +279,7 @@ export default function SalesReport({ orders = [], history = [], products = [], 
                                         #{String(o.id).slice(-4)}
                                     </td>
                                     <td className="p-3">
-                                        {new Date(o.activeDate).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}
+                                        {new Date(o.activeDate).toLocaleTimeString([], {month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'})}
                                     </td>
                                     <td className="p-3">
                                         <span className={`${COMMON_STYLES.badge(isDarkMode)} uppercase`}>

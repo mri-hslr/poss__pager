@@ -14,9 +14,19 @@ export default function RestaurantVendorUI({ user, onLogout, isDarkMode, onToggl
   const token = localStorage.getItem("auth_token");
 
   // Helpers
-  const getRestaurantId = () => user?.restaurantId || user?.user?.restaurantId || user?.restaurant_id || 1;
-  const getUserRole = () => user?.role || user?.user?.role || localStorage.getItem("user_role") || 'cashier';
+  // ✅ FIX: Removed "|| 'Admin'" fallback to prevent ghost user confusion
+  const currentUsername = user?.username || user?.user?.username || 'Staff'; 
+  const currentUserId = user?.id || user?.user?.id; 
+  
+  // Robust Role Check
+  const getUserRole = () => {
+      if (user?.role) return user.role;
+      if (user?.user?.role) return user.user.role;
+      return localStorage.getItem("user_role") || 'cashier';
+  };
   const userRole = getUserRole();
+
+  const getRestaurantId = () => user?.restaurantId || user?.user?.restaurantId || user?.restaurant_id || 1;
 
   // --- STATE ---
   const [orders, setOrders] = useState([]); 
@@ -33,7 +43,7 @@ export default function RestaurantVendorUI({ user, onLogout, isDarkMode, onToggl
   
   const [dockConnected, setDockConnected] = useState(false);
 
-  // Admin State (Shared with POSView)
+  // Admin State
   const [isAddingItem, setIsAddingItem] = useState(false);
   const [newItem, setNewItem] = useState({ name: '', price: '', category: '', stock: '', id: null });
   const [isCreatingCategory, setIsCreatingCategory] = useState(false);
@@ -123,47 +133,32 @@ export default function RestaurantVendorUI({ user, onLogout, isDarkMode, onToggl
   }, [userRole, activeTab]);
 
   // --- HANDLERS ---
-  
-  // 1. ADD Product
   const handleAdminAddProduct = async () => { 
       const rId = getRestaurantId();
-      // Ensure stock is sent as a number, defaulting to 0
       const stockValue = newItem.stock ? parseInt(newItem.stock) : 0;
       const productPayload = { ...newItem, stock: stockValue, restaurantId: rId };
-      
       await fetch(`${API_URL}/products`, { 
           method: 'POST', 
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, 
           body: JSON.stringify(productPayload) 
       }); 
-      
       setNewItem({ name: '', price: '', category: '', stock: '', id: null }); 
       setIsCreatingCategory(false); 
       setIsAddingItem(false); 
       refreshProducts(); 
   };
 
-  // 2. UPDATE Product (New Function for PUT Route)
   const handleAdminUpdateProduct = async () => {
     if (!newItem.id) return alert("Error: No product ID found for update");
-    
     const stockValue = newItem.stock ? parseInt(newItem.stock) : 0;
-    const productPayload = { 
-        name: newItem.name,
-        price: newItem.price,
-        category: newItem.category,
-        stock: stockValue
-    };
-
+    const productPayload = { name: newItem.name, price: newItem.price, category: newItem.category, stock: stockValue };
     try {
         const res = await fetch(`${API_URL}/products/${newItem.id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
             body: JSON.stringify(productPayload)
         });
-
         if (!res.ok) throw new Error("Update failed");
-
         setNewItem({ name: '', price: '', category: '', stock: '', id: null });
         setIsCreatingCategory(false);
         setIsAddingItem(false);
@@ -175,19 +170,14 @@ export default function RestaurantVendorUI({ user, onLogout, isDarkMode, onToggl
   };
 
   const handleAdminAddUser = async () => { 
-    if (!newUser.username || !newUser.email || !newUser.password) {
-      return alert("Fill all fields");
-    }
+    if (!newUser.username || !newUser.email || !newUser.password) { return alert("Fill all fields"); }
     const res = await fetch(`${API_URL}/auth/staff`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify(newUser)
     });
     const data = await res.json();
-    if (!res.ok) {
-      alert(data.message || "Failed to create staff");
-      return;
-    }
+    if (!res.ok) { alert(data.message || "Failed to create staff"); return; }
     setNewUser({ username: '', email: '', password: '', role: 'cashier' });
     refreshUsers();
   };
@@ -218,10 +208,7 @@ export default function RestaurantVendorUI({ user, onLogout, isDarkMode, onToggl
   };
 
   const sendToDock = async (tokenNum) => {
-    if (!dockConnected) {
-        alert("Dock not connected! Please click the Connect Dock button.");
-        return;
-    }
+    if (!dockConnected) { alert("Dock not connected! Please click the Connect Dock button."); return; }
     console.log(`Sending Token ${tokenNum} to Dock...`);
   };
 
@@ -253,13 +240,11 @@ export default function RestaurantVendorUI({ user, onLogout, isDarkMode, onToggl
       const res = await fetch(`${API_URL}/orders`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify(payload) });
       const r = await res.json();
       if (!res.ok) throw new Error(r.message);
-      
       if(dockConnected) sendToDock(selectedToken);
-
       if (method === 'upi') {
           const qrConfig = { pa: settings.upiId, pn: settings.payeeName, cu: 'INR' };
           const qrUrl = getUPIQR(qrConfig, grandTotal, r.token || selectedToken, r.orderId);
-          setActiveUpiData({ qr: qrUrl }); 
+          setActiveUpiData({ qr: qrUrl, orderId: r.orderId }); 
       } else {
           const newO = { id: r.orderId || Date.now(), token: selectedToken, items: [...cart], startedAt: Date.now(), total: grandTotal, status: 'paid' };
           setOrders(p => [...p, newO]);
@@ -272,87 +257,55 @@ export default function RestaurantVendorUI({ user, onLogout, isDarkMode, onToggl
   const handleMarkReady = async (id) => {
       if(!confirm("Complete Order?")) return;
       try {
-        const res = await fetch(`${API_URL}/orders/${id}`, { 
-          method: 'DELETE',
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        if (!res.ok) throw new Error('Failed to complete order');
+        const res = await fetch(`${API_URL}/orders/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
+        if (!res.ok) throw new Error('Failed');
         setOrders(p => p.filter(o => String(o.id) !== String(id)));
-      } catch (e) {
-        alert('Failed to complete order');
-      }
+      } catch (e) { alert('Failed to complete order'); }
   };
 
   const handlePaymentSuccess = () => {
-    setCart([]); 
-    setDiscount(0);
-    setActiveUpiData(null); 
-    setShowCheckout(false); 
-    setTimeout(fetchActiveOrders, 500); 
+    setCart([]); setDiscount(0); setActiveUpiData(null); setShowCheckout(false); setTimeout(fetchActiveOrders, 500); 
+  };
+
+  const handleCancelCheckout = async () => {
+    if (activeUpiData && activeUpiData.orderId) {
+        try { await fetch(`${API_URL}/orders/${activeUpiData.orderId}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } }); } catch (e) {}
+    }
+    setShowCheckout(false); setActiveUpiData(null);
   };
 
   return (
     <div className={`flex flex-col h-screen overflow-hidden ${theme.bg.main} ${theme.text.main}`} style={{ fontFamily: FONTS.sans }}>
-      {/* Header */}
       <header className={`h-16 flex items-center justify-between px-6 border-b ${theme.border.default} ${theme.bg.card}`}>
         <div className="flex items-center gap-6">
-          <div className="flex items-center gap-3">
-            <div className={`p-2 rounded-xl ${theme.bg.subtle}`}><Settings size={20} /></div>
-            <h1 className="text-lg font-semibold">POS</h1>
-          </div>
+          <div className="flex items-center gap-3"><h1 className="text-lg font-semibold">POS</h1></div>
           <nav className="flex items-center gap-1">
-            {[
-              { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard', role: 'admin' },
-              { id: 'menu', icon: Coffee, label: 'Menu' },
-              { id: 'kitchen', icon: Bell, label: 'Kitchen', role: 'cashier', action: () => setShowActiveOrders(true), badge: orders.length },
-              { id: 'users', icon: User, label: 'Staff', role: 'admin' },
-            ].map(item => (
-              (!item.role || item.role === userRole) && (
-                <button 
-                  key={item.id}
-                  onClick={() => item.action ? item.action() : setActiveTab(item.id)}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors relative
-                    ${activeTab === item.id && !item.action ? `${theme.bg.active} ${theme.text.main}` : theme.button.ghost}`}
-                >
-                  <item.icon size={16} />
-                  <span>{item.label}</span>
-                  {item.badge > 0 && (<span className={`${COMMON_STYLES.badge(isDarkMode)} text-[10px] min-w-[18px] h-[18px] flex items-center justify-center`}>{item.badge}</span>)}
-                </button>
-              )
-            ))}
+            {[{ id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard', role: 'admin' }, { id: 'menu', icon: Coffee, label: 'Menu' }, { id: 'kitchen', icon: Bell, label: 'Kitchen', role: 'cashier', action: () => setShowActiveOrders(true), badge: orders.length }, { id: 'users', icon: User, label: 'Staff', role: 'admin' }].map(item => ((!item.role || item.role === userRole) && (<button key={item.id} onClick={() => item.action ? item.action() : setActiveTab(item.id)} className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors relative ${activeTab === item.id && !item.action ? `${theme.bg.active} ${theme.text.main}` : theme.button.ghost}`}><item.icon size={16} /><span>{item.label}</span>{item.badge > 0 && (<span className={`${COMMON_STYLES.badge(isDarkMode)} text-[10px] min-w-[18px] h-[18px] flex items-center justify-center`}>{item.badge}</span>)}</button>)))}
           </nav>
         </div>
         <div className="flex items-center gap-3">
-          {userRole !== 'admin' && (
-            <button onClick={connectDock} className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-sm font-medium transition-all ${dockConnected ? `${theme.bg.active} ${theme.border.default} ${theme.text.main}` : `${theme.border.default} ${theme.button.ghost}`}`}>
-              <Wifi size={16} className={dockConnected ? 'animate-pulse' : ''} />
-              <span className="hidden sm:inline">{dockConnected ? 'Dock' : 'Connect'}</span>
-            </button>
-          )}
-          <button onClick={onToggleTheme} className={`p-2 rounded-lg ${theme.button.ghost}`}>
-            {isDarkMode ? <Sun size={18}/> : <Moon size={18}/>}
-          </button>
+          {userRole !== 'admin' && (<button onClick={connectDock} className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-sm font-medium transition-all ${dockConnected ? `${theme.bg.active} ${theme.border.default} ${theme.text.main}` : `${theme.border.default} ${theme.button.ghost}`}`}><Wifi size={16} className={dockConnected ? 'animate-pulse' : ''} /><span className="hidden sm:inline">{dockConnected ? 'Dock' : 'Connect'}</span></button>)}
+          <button onClick={onToggleTheme} className={`p-2 rounded-lg ${theme.button.ghost}`}>{isDarkMode ? <Sun size={18}/> : <Moon size={18}/>}</button>
           {userRole === 'admin' && (<button onClick={() => setSettingsOpen(true)} className={`p-2 rounded-lg ${theme.button.ghost}`}><Settings size={18}/></button>)}
           <div className="flex items-center gap-3">
             <div className="text-right hidden sm:block">
-              <p className="text-sm font-medium">{user?.username || 'Admin'}</p>
-              <p className={`text-xs uppercase font-medium tracking-wider ${theme.text.tertiary}`}>{userRole}</p>
+                {/* ✅ FIX: SHOW ACTUAL USERNAME OR 'Staff' */}
+                <p className="text-sm font-medium">{currentUsername}</p>
+                <p className={`text-xs uppercase font-medium tracking-wider ${theme.text.tertiary}`}>{userRole}</p>
             </div>
             <div className={`h-8 w-8 rounded-full flex items-center justify-center border ${theme.border.default} ${theme.bg.subtle}`}><User size={16} className={theme.text.secondary}/></div>
           </div>
           <button onClick={onLogout} className={`p-2 rounded-lg ${theme.button.ghost}`}><LogOut size={18} /></button>
         </div>
       </header>
-
-      {/* Main Content */}
       <main className={`flex-1 flex flex-col overflow-hidden ${theme.bg.main}`}>
           <div className="flex-1 overflow-y-auto p-0 relative">
-              {activeTab === 'dashboard' && userRole === 'admin' && (
-                <div className="p-8"><SalesReport orders={orders} products={rawProducts} isDarkMode={isDarkMode} API_URL={API_URL} /></div>
-              )}
+              {activeTab === 'dashboard' && userRole === 'admin' && (<div className="p-8"><SalesReport orders={orders} products={rawProducts} isDarkMode={isDarkMode} API_URL={API_URL} /></div>)}
               {activeTab === 'menu' && (
                   <POSView 
-                    menu={menu} categories={userRole === 'admin' ? [] : categories} cart={cart} orders={orders}
+                    menu={menu} 
+                    categories={categories} 
+                    cart={cart} orders={orders}
                     selectedCategory={userRole === 'admin' ? null : selectedCategory} setSelectedCategory={userRole === 'admin' ? () => {} : setSelectedCategory}
                     availableTokens={availableTokens} selectedToken={selectedToken} onSetToken={setSelectedToken}
                     onAddToCart={addToCart} onRemoveFromCart={removeFromCart} onCheckout={() => setShowCheckout(true)}
@@ -360,11 +313,7 @@ export default function RestaurantVendorUI({ user, onLogout, isDarkMode, onToggl
                     onConnectDock={connectDock} dockConnected={dockConnected} onCallCustomer={(t) => sendToDock(t)}
                     userRole={userRole} isAddingItem={isAddingItem} setIsAddingItem={setIsAddingItem}
                     newItem={newItem} setNewItem={setNewItem} isCreatingCategory={isCreatingCategory} setIsCreatingCategory={setIsCreatingCategory}
-                    
-                    // ✅ PASSED HANDLERS FOR ADD & UPDATE
-                    handleAdminAddProduct={handleAdminAddProduct}
-                    handleAdminUpdateProduct={handleAdminUpdateProduct} 
-                    handleAdminDeleteProduct={(id) => { if (confirm("Delete?")) fetch(`${API_URL}/products/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } }).then(refreshProducts); }}
+                    handleAdminAddProduct={handleAdminAddProduct} handleAdminUpdateProduct={handleAdminUpdateProduct} handleAdminDeleteProduct={(id) => { if (confirm("Delete?")) fetch(`${API_URL}/products/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } }).then(refreshProducts); }}
                     rawProducts={rawProducts}
                   />
               )}
@@ -390,7 +339,9 @@ export default function RestaurantVendorUI({ user, onLogout, isDarkMode, onToggl
                                       <div className={`p-3 rounded-md ${theme.bg.subtle}`}><User size={20}/></div>
                                       <div><p className="font-medium text-sm">{u.username || u.email.split('@')[0]}</p><p className={`text-xs font-medium ${theme.text.tertiary}`}>{u.role}</p><p className={`text-xs ${theme.text.muted}`}>{u.email}</p></div>
                                   </div>
-                                  <button onClick={() => handleAdminDeleteUser(u.id)} className={`p-2 rounded-md opacity-0 group-hover:opacity-100 transition-all outline-none ${theme.bg.hover}`}><Trash2 size={16} className={theme.text.secondary}/></button>
+                                  {u.id !== currentUserId && (
+                                    <button onClick={() => handleAdminDeleteUser(u.id)} className={`p-2 rounded-md opacity-0 group-hover:opacity-100 transition-all outline-none ${theme.bg.hover}`}><Trash2 size={16} className={theme.text.secondary}/></button>
+                                  )}
                               </div>
                           ))}
                       </div>
@@ -398,30 +349,8 @@ export default function RestaurantVendorUI({ user, onLogout, isDarkMode, onToggl
               )}
           </div>
       </main>
-
-      <CheckoutModal 
-          isOpen={showCheckout} 
-          onClose={() => setShowCheckout(false)} 
-          onConfirm={finalizeOrder} 
-          cartSubtotal={cartSubtotal} 
-          taxAmount={taxAmount} 
-          discount={discount} 
-          grandTotal={grandTotal} 
-          orderId={orders.length + 1} 
-          isDarkMode={isDarkMode} 
-          upiId={settings.upiId} 
-          payeeName={settings.payeeName} 
-          backendUpiData={activeUpiData} 
-          onPaymentComplete={handlePaymentSuccess} 
-      />
-      <ActiveOrdersDrawer 
-          isOpen={showActiveOrders} 
-          onClose={() => setShowActiveOrders(false)} 
-          orders={orders} 
-          onCompleteOrder={handleMarkReady} 
-          onCallCustomer={(t) => sendToDock(t)} 
-          isDarkMode={isDarkMode} 
-      />
+      <CheckoutModal isOpen={showCheckout} onClose={handleCancelCheckout} onConfirm={finalizeOrder} cartSubtotal={cartSubtotal} taxAmount={taxAmount} discount={discount} grandTotal={grandTotal} orderId={orders.length + 1} isDarkMode={isDarkMode} upiId={settings.upiId} payeeName={settings.payeeName} backendUpiData={activeUpiData} onPaymentComplete={handlePaymentSuccess} />
+      <ActiveOrdersDrawer isOpen={showActiveOrders} onClose={() => setShowActiveOrders(false)} orders={orders} onCompleteOrder={handleMarkReady} onCallCustomer={(t) => sendToDock(t)} isDarkMode={isDarkMode} />
       {userRole === 'admin' && (<AdminSettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} restaurantId={getRestaurantId()} />)}
     </div>
   );
