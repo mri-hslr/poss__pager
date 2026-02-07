@@ -91,20 +91,32 @@ exports.getActiveOrders = async (req, res) => {
 };
 
 // ---------------- 3. GET SALES HISTORY ----------------
+// controllers/orderController.js
+
 exports.getSalesHistory = async (req, res) => {
   try {
     const restaurantId = req.user.restaurantId;
-    const { date } = req.query; 
+    const { date, startDate, endDate } = req.query;
 
-    if (!date) return res.status(400).json({ message: "Date required" });
+    let query = `SELECT * FROM orders WHERE restaurant_id = ?`;
+    let params = [restaurantId];
 
-    const [orders] = await db.query(
-      `SELECT * FROM orders 
-       WHERE restaurant_id = ? AND DATE(created_at) = ?
-       ORDER BY created_at DESC`,
-      [restaurantId, date]
-    );
+    // ✅ FIX: Handle Range vs Single Date
+    if (startDate && endDate) {
+      query += ` AND DATE(created_at) BETWEEN ? AND ?`;
+      params.push(startDate, endDate);
+    } else if (date) {
+      query += ` AND DATE(created_at) = ?`;
+      params.push(date);
+    } else {
+      return res.status(400).json({ message: "Date or Range required" });
+    }
 
+    query += ` ORDER BY created_at DESC`;
+
+    const [orders] = await db.query(query, params);
+
+    // Fetch items for these orders
     for (let order of orders) {
       const [items] = await db.query(
         `SELECT * FROM order_items WHERE order_id = ?`,

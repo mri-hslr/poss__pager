@@ -12,7 +12,6 @@ export default function SalesReport({
   const theme = getTheme(isDarkMode);
   const token = localStorage.getItem("auth_token");
   
-  // 1. Get Today's Date in YYYY-MM-DD
   const getLocalDate = () => {
     const d = new Date();
     const year = d.getFullYear();
@@ -21,18 +20,19 @@ export default function SalesReport({
     return `${year}-${month}-${day}`;
   };
 
-  const [reportDate, setReportDate] = useState(getLocalDate());
+  const todayStr = getLocalDate();
+  const [dateRange, setDateRange] = useState({ from: todayStr, to: todayStr });
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  // 2. Fetch History
   useEffect(() => {
     const fetchHistory = async () => {
-        if (!token || !reportDate) return; 
+        if (!token || !dateRange.from) return; 
 
         setLoading(true);
         try {
-            const res = await fetch(`${API_URL}/orders/history?date=${reportDate}`, {
+            const end = dateRange.to || dateRange.from;
+            const res = await fetch(`${API_URL}/orders/history?startDate=${dateRange.from}&endDate=${end}`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             
@@ -51,9 +51,8 @@ export default function SalesReport({
     };
     
     fetchHistory();
-  }, [reportDate, API_URL, token]);
+  }, [dateRange, API_URL, token]);
 
-  // 3. Normalization & Filtering
   const repairOrderData = (o) => {
     let amount = 0;
     if (o.total) amount = Number(o.total);
@@ -112,23 +111,50 @@ export default function SalesReport({
       if (!o.activeDate) return false;
       const d = new Date(o.activeDate);
       if (isNaN(d.getTime())) return false;
-      const orderDateStr = d.toISOString().slice(0, 10);
-      return orderDateStr.startsWith(reportDate); 
+      
+      const orderTime = d.getTime();
+      const startTime = new Date(dateRange.from).setHours(0,0,0,0);
+      const endTime = new Date(dateRange.to || dateRange.from).setHours(23,59,59,999);
+
+      return orderTime >= startTime && orderTime <= endTime;
     })
     .sort((a, b) => new Date(b.activeDate) - new Date(a.activeDate)), 
-  [combinedOrders, reportDate, products]);
+  [combinedOrders, dateRange, products]);
 
-  // 4. Calculations
   const chartData = useMemo(() => {
-    const hours = Array(24).fill(0);
-    filteredOrders.forEach(o => { 
-        const h = new Date(o.activeDate).getHours();
-        hours[h] += o.amount; 
-    });
-    return hours;
-  }, [filteredOrders]);
+    const isSingleDay = dateRange.from === dateRange.to;
+    
+    if (isSingleDay) {
+        const hours = Array(24).fill(0);
+        filteredOrders.forEach(o => { 
+            const h = new Date(o.activeDate).getHours();
+            hours[h] += o.amount; 
+        });
+        return { labels: Array.from({length:24},(_,i)=>`${i}:00`), data: hours, type: 'Hourly' };
+    } else {
+        const dailyMap = {};
+        // Generate array of dates between range to ensure 0-value days are shown
+        let curr = new Date(dateRange.from);
+        const end = new Date(dateRange.to);
+        while (curr <= end) {
+            const dateStr = curr.toLocaleDateString('en-US', {month:'short', day:'numeric'});
+            dailyMap[dateStr] = 0;
+            curr.setDate(curr.getDate() + 1);
+        }
 
-  const maxSales = Math.max(...chartData, 100);
+        filteredOrders.forEach(o => {
+            const dayStr = new Date(o.activeDate).toLocaleDateString('en-US', {month:'short', day:'numeric'});
+            if (dailyMap[dayStr] !== undefined) dailyMap[dayStr] += o.amount;
+        });
+        return { 
+            labels: Object.keys(dailyMap), 
+            data: Object.values(dailyMap),
+            type: 'Daily'
+        };
+    }
+  }, [filteredOrders, dateRange]);
+
+  const maxSales = Math.max(...chartData.data, 100);
   const totalRevenue = filteredOrders.reduce((sum, o) => sum + o.amount, 0);
   const totalTax = filteredOrders.reduce((sum, o) => sum + o.tax, 0);
   const totalCash = filteredOrders.filter(o => o.method === 'CASH').reduce((sum, o) => sum + o.amount, 0);
@@ -139,7 +165,7 @@ export default function SalesReport({
     const headers = ["ID", "Time", "Items", "Total", "Method", "Status"];
     const rows = filteredOrders.map(o => [
         o.id, 
-        new Date(o.activeDate).toLocaleTimeString(), 
+        new Date(o.activeDate).toLocaleString(), 
         `"${o.items?.map(i => `${i.name}(${i.quantity})`).join('|') || ''}"`, 
         o.amount, 
         o.method,
@@ -149,7 +175,7 @@ export default function SalesReport({
     const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows].join("\n");
     const link = document.createElement("a");
     link.setAttribute("href", encodeURI(csvContent));
-    link.setAttribute("download", `Sales_${reportDate}.csv`);
+    link.setAttribute("download", `Sales_${dateRange.from}_to_${dateRange.to}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -157,18 +183,17 @@ export default function SalesReport({
 
   return (
     <div className={`flex flex-col h-full antialiased animate-in fade-in zoom-in-95 duration-300`} style={{ fontFamily: FONTS.sans }}>
-        {/* HEADER */}
         <div className="flex justify-between items-center mb-6 shrink-0">
             <div>
                 <h1 className={`text-2xl font-semibold ${theme.text.main}`}>Dashboard</h1>
                 <p className={`text-sm ${theme.text.secondary} flex items-center gap-2`}>
-                    Overview for {reportDate} 
+                    Overview {dateRange.from === dateRange.to ? `for ${dateRange.from}` : `from ${dateRange.from} to ${dateRange.to}`}
                     {loading && <span className="inline-flex items-center text-xs text-blue-500 animate-pulse"><Loader2 size={12} className="mr-1 animate-spin"/> Syncing...</span>}
                 </p>
             </div>
             
             <div className="flex gap-3">
-                <DatePicker value={reportDate} onChange={setReportDate} isDarkMode={isDarkMode} />
+                <DatePicker value={dateRange} onChange={setDateRange} isDarkMode={isDarkMode} />
                 <button 
                     onClick={exportData} 
                     className={`px-4 py-2 rounded-lg border flex items-center gap-2 transition-all ${theme.button.secondary}`}
@@ -178,7 +203,6 @@ export default function SalesReport({
             </div>
         </div>
 
-        {/* METRICS */}
         <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4 mb-6 shrink-0">
             {[
                 { icon: Wallet, label: 'Revenue', value: `₹${totalRevenue}` },
@@ -197,16 +221,16 @@ export default function SalesReport({
             ))}
         </div>
 
-        {/* GRAPH */}
         <div className={`mb-6 rounded-xl border p-6 shrink-0 ${COMMON_STYLES.card(isDarkMode)}`}>
             <div className="flex items-center gap-2 mb-6">
                 <TrendingUp size={20} className={theme.text.secondary}/>
-                <h2 className={`font-semibold ${theme.text.main}`}>Hourly Activity</h2>
+                <h2 className={`font-semibold ${theme.text.main}`}>{chartData.type} Activity</h2>
             </div>
             <div className="overflow-x-auto pb-2">
                 <div className="h-40 flex gap-3 items-end min-w-[600px] md:min-w-0">
-                    {chartData.map((val, h) => (
-                        <div key={h} className="flex-1 flex flex-col justify-end items-center group relative h-full">
+                    {chartData.data.map((val, idx) => (
+                        // ✅ FIX: Added max-w-[60px] to limit bar width
+                        <div key={idx} className="flex-1 max-w-[60px] flex flex-col justify-end items-center group relative h-full">
                             {val > 0 && (
                                 <div className={`absolute bottom-full mb-2 px-2 py-1 rounded text-xs z-10 ${isDarkMode ? 'bg-white text-black' : 'bg-black text-white'}`}>
                                     ₹{val}
@@ -216,14 +240,15 @@ export default function SalesReport({
                                 className={`w-full rounded-t transition-all duration-500 ${val > 0 ? (isDarkMode ? 'bg-white' : 'bg-black') : theme.bg.subtle}`} 
                                 style={{height: `${(val / maxSales) * 100}%`, minHeight: '4px'}}
                             />
-                            <span className={`text-[10px] ${theme.text.secondary} mt-2`}>{h}:00</span>
+                            <span className={`text-[10px] ${theme.text.secondary} mt-2 whitespace-nowrap`}>
+                                {chartData.labels[idx]}
+                            </span>
                         </div>
                     ))}
                 </div>
             </div>
         </div>
 
-        {/* HISTORY */}
         <div className={`flex-1 overflow-hidden rounded-xl border flex flex-col ${COMMON_STYLES.card(isDarkMode)}`}>
             <div className={`p-4 border-b font-semibold flex items-center gap-2 ${theme.border.default} ${theme.text.main}`}>
                 <Banknote size={20} className={theme.text.secondary}/> Transaction History
@@ -244,7 +269,7 @@ export default function SalesReport({
                         {filteredOrders.length === 0 ? (
                             <tr>
                                 <td colSpan="6" className={`p-8 text-center ${theme.text.secondary}`}>
-                                    {loading ? "Loading..." : `No transactions found for ${reportDate}.`}
+                                    {loading ? "Loading..." : `No transactions found.`}
                                 </td>
                             </tr>
                         ) : (
@@ -254,7 +279,7 @@ export default function SalesReport({
                                         #{String(o.id).slice(-4)}
                                     </td>
                                     <td className="p-3">
-                                        {new Date(o.activeDate).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}
+                                        {new Date(o.activeDate).toLocaleTimeString([], {month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'})}
                                     </td>
                                     <td className="p-3">
                                         <span className={`${COMMON_STYLES.badge(isDarkMode)} uppercase`}>
