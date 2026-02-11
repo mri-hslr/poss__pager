@@ -51,13 +51,12 @@ export default function RestaurantVendorUI({
   const [showActiveOrders, setShowActiveOrders] = useState(false);
   const [showCheckout, setShowCheckout] = useState(false);
   const [activeTab, setActiveTab] = useState(
-    userRole === "admin" ? "dashboard" : "menu"
+    userRole === "admin" ? "dashboard" : "menu",
   );
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   const [dockConnected, setDockConnected] = useState(false);
-  // Add this with your other refs/state
-  const portRef = useRef(null);
+
   // Admin State (Shared with POSView)
   const [isAddingItem, setIsAddingItem] = useState(false);
   const [newItem, setNewItem] = useState({
@@ -90,7 +89,7 @@ export default function RestaurantVendorUI({
     try {
       const res = await fetch(
         `${API_URL}/products?restaurantId=${getRestaurantId()}`,
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${token}` } },
       );
       if (res.ok) {
         const list = await res.json();
@@ -138,7 +137,7 @@ export default function RestaurantVendorUI({
         const serverOrders = await res.json();
         if (Array.isArray(serverOrders)) {
           const activeOnly = serverOrders.filter(
-            (o) => (o.payment_status || "").toLowerCase() !== "completed"
+            (o) => (o.payment_status || "").toLowerCase() !== "completed",
           );
           setOrders(
             activeOnly.map((o) => ({
@@ -151,7 +150,7 @@ export default function RestaurantVendorUI({
               ).toLowerCase(),
               total: Number(o.total || 0),
               items: o.items || [],
-            }))
+            })),
           );
         }
       }
@@ -282,10 +281,6 @@ export default function RestaurantVendorUI({
       if ("serial" in navigator) {
         const port = await navigator.serial.requestPort();
         await port.open({ baudRate: 9600 });
-
-        // STORE THE PORT HERE
-        portRef.current = port;
-
         setDockConnected(true);
         alert("✅ Dock Connected Successfully!");
       } else {
@@ -298,63 +293,38 @@ export default function RestaurantVendorUI({
   };
 
   const sendToDock = async (tokenNum) => {
-    // Check if port exists and is writable
-    if (!dockConnected || !portRef.current || !portRef.current.writable) {
-      alert("Dock not connected or not writable! Please connect dock.");
+    if (!dockConnected) {
+      alert("Dock not connected! Please click the Connect Dock button.");
       return;
     }
-
-    // 1. Get the writer
-    const writer = portRef.current.writable.getWriter();
-
-    try {
-      // 2. Write the data
-
-      console.log(`Sending Token ${tokenNum} to Dock...`);
-
-      const data = new TextEncoder().encode(`*${tokenNum}*\n`);
-      await writer.write(data);
-    } catch (error) {
-      console.error("Error writing to serial port:", error);
-      alert("Failed to send to dock");
-    } finally {
-      // 3. CRITICAL: Release the lock so the port can be used again later
-      writer.releaseLock();
-    }
+    console.log(`Sending Token ${tokenNum} to Dock...`);
   };
 
   // Cart Logic
   const cartSubtotal = cart.reduce((s, i) => s + i.price * i.quantity, 0);
   const taxAmount = Math.max(0, cartSubtotal - discount) * (taxRate / 100);
   const grandTotal = Math.round(
-    Math.max(0, cartSubtotal - discount) + taxAmount
+    Math.max(0, cartSubtotal - discount) + taxAmount,
   );
 
   const availableTokens = useMemo(() => {
     const used = orders.map((o) => String(o.token));
     return Array.from({ length: 50 }, (_, i) => String(i + 1)).filter(
-      (t) => !used.includes(t)
+      (t) => !used.includes(t),
     );
   }, [orders]);
 
-  // Only auto-switch if the CURRENT selected token is actually in use (invalid)
-  // or if no token is selected at all.
   useEffect(() => {
-    if (availableTokens.length > 0) {
-      // If current selection is valid, DO NOTHING. Keep user selection.
-      if (availableTokens.includes(selectedToken)) return;
-
-      // If current selection is invalid (used), pick the first available one.
+    if (availableTokens.length > 0 && !availableTokens.includes(selectedToken))
       setSelectedToken(availableTokens[0]);
-    }
-  }, [availableTokens, selectedToken]); // Keep dependencies the same
+  }, [availableTokens, selectedToken]);
 
   const addToCart = (item) =>
     setCart((p) => {
       const f = p.find((i) => i.id === item.id);
       return f
         ? p.map((i) =>
-            i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i
+            i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i,
           )
         : [...p, { ...item, quantity: 1 }];
     });
@@ -364,38 +334,17 @@ export default function RestaurantVendorUI({
       if (!f) return p;
       if (f.quantity === 1) return p.filter((i) => i.id !== item.id);
       return p.map((i) =>
-        i.id === item.id ? { ...i, quantity: i.quantity - 1 } : i
+        i.id === item.id ? { ...i, quantity: i.quantity - 1 } : i,
       );
     });
 
-  // --- 1. FIXED: Handle the Checkout Button Click ---
-  const handleCheckoutClick = () => {
-    // FORCE a log to see if the function even fires
-    console.log("!!! handleCheckoutClick TRIGGERED !!!");
-    console.log("Current selectedToken:", selectedToken);
-    console.log("Dock Status:", dockConnected);
-
-    if (dockConnected && selectedToken) {
-      console.log(`Sending token ${selectedToken} to dock hardware...`);
-      sendToDock(selectedToken);
-    } else {
-      console.warn("Signal not sent: Dock not connected or Token missing.");
-    }
-    setShowCheckout(true);
-  };
-
-  // --- 2. FIXED: Handle the Database Save ---
   const finalizeOrder = async (payData) => {
     let method = typeof payData === "object" ? payData.paymentMethod : payData;
-
-    // Fix: Using the globally calculated 'grandTotal' from your component scope
-    const tokenToSave = Number(selectedToken);
-
     const payload = {
       restaurantId: getRestaurantId(),
       paymentMethod: method,
-      token: tokenToSave,
-      total: grandTotal, // Uses the 'grandTotal' calculated above your handlers
+      token: Number(selectedToken),
+      total: grandTotal,
       items: cart.map((i) => ({
         productId: i.id,
         name: i.name,
@@ -403,9 +352,7 @@ export default function RestaurantVendorUI({
         quantity: i.quantity,
       })),
     };
-
     try {
-      console.log("Saving order to database...", payload);
       const res = await fetch(`${API_URL}/orders`, {
         method: "POST",
         headers: {
@@ -417,18 +364,25 @@ export default function RestaurantVendorUI({
       const r = await res.json();
       if (!res.ok) throw new Error(r.message);
 
+      if (dockConnected) sendToDock(selectedToken);
+
       if (method === "upi") {
         const qrConfig = {
           pa: settings.upiId,
           pn: settings.payeeName,
           cu: "INR",
         };
-        const qrUrl = getUPIQR(qrConfig, grandTotal, tokenToSave, r.orderId);
+        const qrUrl = getUPIQR(
+          qrConfig,
+          grandTotal,
+          r.token || selectedToken,
+          r.orderId,
+        );
         setActiveUpiData({ qr: qrUrl });
       } else {
         const newO = {
           id: r.orderId || Date.now(),
-          token: String(tokenToSave),
+          token: selectedToken,
           items: [...cart],
           startedAt: Date.now(),
           total: grandTotal,
@@ -441,7 +395,6 @@ export default function RestaurantVendorUI({
         setTimeout(fetchActiveOrders, 500);
       }
     } catch (e) {
-      console.error("Finalize Error:", e);
       alert(e.message);
       setShowCheckout(false);
     }
@@ -512,25 +465,19 @@ export default function RestaurantVendorUI({
                       item.action ? item.action() : setActiveTab(item.id)
                     }
                     className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors relative
-                    ${
-                      activeTab === item.id && !item.action
-                        ? `${theme.bg.active} ${theme.text.main}`
-                        : theme.button.ghost
-                    }`}
+                    ${activeTab === item.id && !item.action ? `${theme.bg.active} ${theme.text.main}` : theme.button.ghost}`}
                   >
                     <item.icon size={16} />
                     <span>{item.label}</span>
                     {item.badge > 0 && (
                       <span
-                        className={`${COMMON_STYLES.badge(
-                          isDarkMode
-                        )} text-[10px] min-w-[18px] h-[18px] flex items-center justify-center`}
+                        className={`${COMMON_STYLES.badge(isDarkMode)} text-[10px] min-w-[18px] h-[18px] flex items-center justify-center`}
                       >
                         {item.badge}
                       </span>
                     )}
                   </button>
-                )
+                ),
             )}
           </nav>
         </div>
@@ -538,11 +485,7 @@ export default function RestaurantVendorUI({
           {userRole !== "admin" && (
             <button
               onClick={connectDock}
-              className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-sm font-medium transition-all ${
-                dockConnected
-                  ? `${theme.bg.active} ${theme.border.default} ${theme.text.main}`
-                  : `${theme.border.default} ${theme.button.ghost}`
-              }`}
+              className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-sm font-medium transition-all ${dockConnected ? `${theme.bg.active} ${theme.border.default} ${theme.text.main}` : `${theme.border.default} ${theme.button.ghost}`}`}
             >
               <Wifi
                 size={16}
@@ -561,7 +504,7 @@ export default function RestaurantVendorUI({
           </button>
           {userRole === "admin" && (
             <button
-              onClick={() => setSettingsOpen(true)}
+              onClick={() => setActiveTab("settings")}
               className={`p-2 rounded-lg ${theme.button.ghost}`}
             >
               <Settings size={18} />
@@ -619,7 +562,7 @@ export default function RestaurantVendorUI({
               onSetToken={setSelectedToken}
               onAddToCart={addToCart}
               onRemoveFromCart={removeFromCart}
-              onCheckout={handleCheckoutClick}
+              onCheckout={() => setShowCheckout(true)}
               isDarkMode={isDarkMode}
               discount={discount}
               setDiscount={setDiscount}
@@ -651,9 +594,7 @@ export default function RestaurantVendorUI({
             <div className="max-w-4xl mx-auto p-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
               <h2 className="text-2xl font-semibold mb-8">Staff Management</h2>
               <div
-                className={`p-6 rounded-lg border mb-8 ${COMMON_STYLES.card(
-                  isDarkMode
-                )}`}
+                className={`p-6 rounded-lg border mb-8 ${COMMON_STYLES.card(isDarkMode)}`}
               >
                 <h3
                   className={`text-sm font-semibold mb-4 flex items-center gap-2 ${theme.text.main}`}
@@ -739,9 +680,7 @@ export default function RestaurantVendorUI({
                 {usersList.map((u) => (
                   <div
                     key={u.id}
-                    className={`p-5 rounded-lg border flex justify-between items-center group transition-colors ${COMMON_STYLES.card(
-                      isDarkMode
-                    )} ${theme.border.hover}`}
+                    className={`p-5 rounded-lg border flex justify-between items-center group transition-colors ${COMMON_STYLES.card(isDarkMode)} ${theme.border.hover}`}
                   >
                     <div className="flex items-center gap-4">
                       <div className={`p-3 rounded-md ${theme.bg.subtle}`}>
@@ -772,6 +711,16 @@ export default function RestaurantVendorUI({
               </div>
             </div>
           )}
+          {activeTab === "settings" && userRole === "admin" && (
+            <div className={`p-8 h-full ${theme.bg.main} ${theme.text.main}`}>
+              <AdminSettingsModal
+                open={true}
+                onClose={() => setActiveTab("dashboard")}
+                restaurantId={getRestaurantId()}
+                isDarkMode={isDarkMode}
+              />
+            </div>
+          )}
         </div>
       </main>
 
@@ -798,13 +747,6 @@ export default function RestaurantVendorUI({
         onCallCustomer={(t) => sendToDock(t)}
         isDarkMode={isDarkMode}
       />
-      {userRole === "admin" && (
-        <AdminSettingsModal
-          open={settingsOpen}
-          onClose={() => setSettingsOpen(false)}
-          restaurantId={getRestaurantId()}
-        />
-      )}
     </div>
   );
 }
