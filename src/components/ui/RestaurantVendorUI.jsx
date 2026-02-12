@@ -386,16 +386,18 @@ export default function RestaurantVendorUI({
 
   // --- 2. FIXED: Handle the Database Save ---
   const finalizeOrder = async (payData) => {
+    // 1. Identify the payment method
     let method = typeof payData === "object" ? payData.paymentMethod : payData;
-
-    // Fix: Using the globally calculated 'grandTotal' from your component scope
+  
+    // 2. Capture the EXACT token currently selected in the UI
+    // We convert to Number to match your DB schema (INT)
     const tokenToSave = Number(selectedToken);
-
+  
     const payload = {
       restaurantId: getRestaurantId(),
       paymentMethod: method,
-      token: tokenToSave,
-      total: grandTotal, // Uses the 'grandTotal' calculated above your handlers
+      token: tokenToSave, // This is the most important line
+      total: grandTotal,
       items: cart.map((i) => ({
         productId: i.id,
         name: i.name,
@@ -403,7 +405,7 @@ export default function RestaurantVendorUI({
         quantity: i.quantity,
       })),
     };
-
+  
     try {
       console.log("Saving order to database...", payload);
       const res = await fetch(`${API_URL}/orders`, {
@@ -414,9 +416,10 @@ export default function RestaurantVendorUI({
         },
         body: JSON.stringify(payload),
       });
+  
       const r = await res.json();
-      if (!res.ok) throw new Error(r.message);
-
+      if (!res.ok) throw new Error(r.message || "Failed to save order");
+  
       if (method === "upi") {
         const qrConfig = {
           pa: settings.upiId,
@@ -426,18 +429,25 @@ export default function RestaurantVendorUI({
         const qrUrl = getUPIQR(qrConfig, grandTotal, tokenToSave, r.orderId);
         setActiveUpiData({ qr: qrUrl });
       } else {
+        // 3. Update the Kitchen State IMMEDIATELY for Cash/Card
         const newO = {
           id: r.orderId || Date.now(),
-          token: String(tokenToSave),
-          items: [...cart],
-          startedAt: Date.now(),
+          token: tokenToSave, // Store as the number selected
+          items: [], // Keeping empty since you don't want to show items
+          startedAt: new Date().toISOString(),
           total: grandTotal,
-          status: "paid",
+          payment_status: "pending", // Must be 'pending' to show in your kitchen filter
         };
-        setOrders((p) => [...p, newO]);
+  
+        // Add to the top of the list so the kitchen sees it instantly
+        setOrders((p) => [newO, ...p]);
+        
+        // 4. Reset POS UI
         setCart([]);
         setDiscount(0);
         setShowCheckout(false);
+  
+        // 5. Re-sync with server after a short delay to ensure DB consistency
         setTimeout(fetchActiveOrders, 500);
       }
     } catch (e) {

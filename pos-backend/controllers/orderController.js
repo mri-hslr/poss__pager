@@ -2,47 +2,36 @@ const db = require("../db");
 const QRCode = require("qrcode");
 
 // ---------------- 1. CREATE ORDER ----------------
+// ---------------- 1. CREATE ORDER ----------------
 exports.createOrder = async (req, res) => {
   try {
-    const { items, paymentMethod } = req.body;
+    console.log("DEBUG: Received token from frontend:", token);
+    // 1. Destructure token and items from req.body
+    const { total, paymentMethod, token, items } = req.body;
     const restaurantId = req.user.restaurantId;
 
-    if (!items || !items.length) {
-      return res.status(400).json({ message: "No items" });
-    }
-
-    const total = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
-
-    // Generate Token
-    let token = 1;
-    try {
-        const [[{ maxToken }]] = await db.query(
-          `SELECT MAX(token) AS maxToken FROM orders WHERE restaurant_id = ?`,
-          [restaurantId]
-        );
-        token = (maxToken || 0) + 1;
-    } catch (err) { 
-        console.log("Token generation fallback"); 
-    }
-
-    // Insert Order
+    // 2. Insert Order using the TOKEN from frontend
     const [result] = await db.query(
       `INSERT INTO orders (restaurant_id, total, payment_method, payment_status, token)
        VALUES (?, ?, ?, 'pending', ?)`,
       [restaurantId, total, paymentMethod, token]
     );
+    const [verify] = await db.query("SELECT token FROM orders WHERE id = ?", [result.insertId]);
+    console.log("DEBUG: DB physically saved token as:", verify[0].token);
     const orderId = result.insertId;
 
-    // Insert Items
-    for (const item of items) {
-      await db.query(
-        `INSERT INTO order_items (order_id, product_id, name, price, quantity)
-         VALUES (?, ?, ?, ?, ?)`,
-        [orderId, item.productId, item.name || 'Item', item.price, item.quantity]
-      );
+    // 3. Insert Items
+    if (items && Array.isArray(items)) {
+      for (const item of items) {
+        await db.query(
+          `INSERT INTO order_items (order_id, product_id, name, price, quantity)
+           VALUES (?, ?, ?, ?, ?)`,
+          [orderId, item.productId, item.name || 'Item', item.price, item.quantity]
+        );
+      }
     }
 
-    // Generate QR
+    // 4. Generate QR (Optional logic for UPI)
     let upi = null;
     if (paymentMethod === "upi") {
       const [settingsRows] = await db.query(
@@ -56,14 +45,14 @@ exports.createOrder = async (req, res) => {
       }
     }
 
-    res.json({ orderId, token, total, upi });
+    // 5. Send ONE final response
+    res.json({ orderId, token:Number(token), total, upi });
 
   } catch (err) {
     console.error("Create Order Error:", err);
     res.status(500).json({ message: "Create Failed: " + err.message });
   }
 };
-
 // ---------------- 2. GET ACTIVE ORDERS ----------------
 exports.getActiveOrders = async (req, res) => {
   try {
