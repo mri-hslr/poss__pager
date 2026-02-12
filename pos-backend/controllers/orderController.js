@@ -5,10 +5,10 @@ const QRCode = require("qrcode");
 // ---------------- 1. CREATE ORDER ----------------
 exports.createOrder = async (req, res) => {
   try {
-    console.log("DEBUG: Received token from frontend:", token);
     // 1. Destructure token and items from req.body
     const { total, paymentMethod, token, items } = req.body;
     const restaurantId = req.user.restaurantId;
+    console.log("DEBUG: Received token from frontend:", token);
 
     // 2. Insert Order using the TOKEN from frontend
     const [result] = await db.query(
