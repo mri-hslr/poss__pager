@@ -92,26 +92,24 @@ exports.getSalesHistory = async (req, res) => {
     const restaurantId = req.user.restaurantId;
     const { date } = req.query; 
 
-    if (!date) return res.status(400).json({ message: "Date required" });
+    // 1. Get the summary (totals)
+    const summary = await OrderModel.getDailySalesSummary(restaurantId, date);
+    
+    // 2. Get the individual orders
+    const orders = await OrderModel.getHistoryByDate(restaurantId, date);
 
-    const [orders] = await db.query(
-      `SELECT * FROM orders 
-       WHERE restaurant_id = ? AND DATE(created_at) = ?
-       ORDER BY created_at DESC`,
-      [restaurantId, date]
-    );
-
+    // 3. Attach items to each order
     for (let order of orders) {
-      const [items] = await db.query(
-        `SELECT * FROM order_items WHERE order_id = ?`,
-        [order.id]
-      );
+      const [items] = await db.query("SELECT * FROM order_items WHERE order_id = ?", [order.id]);
       order.items = items;
     }
-    res.json(orders);
+
+    res.json({
+      summary,
+      orders
+    });
   } catch (err) {
-    console.error("History Error:", err);
-    res.status(500).json({ message: "History Failed: " + err.message });
+    res.status(500).json({ message: err.message });
   }
 };
 

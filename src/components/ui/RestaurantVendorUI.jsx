@@ -332,7 +332,7 @@ export default function RestaurantVendorUI({
 
   const availableTokens = useMemo(() => {
     const used = orders.map((o) => String(o.token));
-    return Array.from({ length: 50 }, (_, i) => String(i + 1)).filter(
+    return Array.from({ length: 6 }, (_, i) => String(i + 1)).filter(
       (t) => !used.includes(t)
     );
   }, [orders]);
