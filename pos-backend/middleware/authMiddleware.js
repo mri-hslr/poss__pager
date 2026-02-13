@@ -1,5 +1,5 @@
 const jwt = require("jsonwebtoken");
-
+console.log("DEBUG: JWT_SECRET loaded from process.env:", !!process.env.JWT_SECRET);
 const JWT_SECRET = process.env.JWT_SECRET || "supersecretkey";
 
 function authMiddleware(req, res, next) {
